@@ -11,7 +11,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@minivera/testifyjs": "file:../testifyjs",
+    "@minivera/testifyjs": "^1.0.2",
     "@types/node-fetch": "^2.5.9",
     "@types/uuid": "^8.3.0",
     "@typescript-eslint/eslint-plugin": "^4.4.0",
