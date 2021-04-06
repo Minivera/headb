@@ -3,6 +3,7 @@ import { Application, Id, NullableId, Params } from '@feathersjs/feathers';
 import { BadRequest, NotFound } from '@feathersjs/errors';
 
 import { CollectionService } from './collectionService';
+import { validate } from 'uuid';
 
 export interface Document {
   id?: string;
@@ -32,15 +33,25 @@ export class DocumentService extends Service<Document> {
   }
 
   async get(id: Id, params: Params): Promise<Document> {
+    if (!validate(id.toString())) {
+      throw new BadRequest(`Invalid uuid ${id}`);
+    }
+
     const collectionId = params.route?.collectionId;
 
-    return this.knex('documents')
+    const found = await this.knex('documents')
       .where({
         id: id,
         collection_id: await this.getCollectionId(collectionId, params),
       })
       .select()
       .first();
+
+    if (!found) {
+      throw new NotFound(`Could not find document for id ${id}`);
+    }
+
+    return found;
   }
 
   async create(data: Document, params: Params): Promise<Document | Document[]> {
@@ -93,6 +104,10 @@ export class DocumentService extends Service<Document> {
   private async getCollectionId(collectionId: string | undefined, params: Params) {
     if (!collectionId) {
       throw new BadRequest('You need to provide a collectionID.');
+    }
+
+    if (!validate(collectionId)) {
+      throw new BadRequest(`Invalid uuid ${collectionId}`);
     }
 
     const collectionService = this.app.service('users/:userId/collections') as CollectionService;

@@ -1,6 +1,7 @@
 import { Application, Id, NullableId, Params } from '@feathersjs/feathers';
 import { Service, KnexServiceOptions } from 'feathers-knex';
 import { BadRequest, NotFound } from '@feathersjs/errors';
+import { validate } from 'uuid';
 
 import { UserService } from './userService';
 
@@ -34,13 +35,23 @@ export class CollectionService extends Service<Collection> {
   async get(id: Id, params: Params): Promise<Collection> {
     const userId = params.route?.userId;
 
-    return this.knex('collections')
+    if (!validate(id.toString())) {
+      throw new BadRequest(`Invalid uuid ${id}`);
+    }
+
+    const found = await this.knex('collections')
       .where({
         id: id,
         user_id: await this.getUserId(userId),
       })
       .select()
       .first();
+
+    if (!found) {
+      throw new NotFound(`Could not find collection for id ${id}`);
+    }
+
+    return found;
   }
 
   async create(data: Collection, params: Params): Promise<Collection | Collection[]> {
@@ -93,6 +104,10 @@ export class CollectionService extends Service<Collection> {
   private async getUserId(userId?: string) {
     if (!userId) {
       throw new BadRequest('You need to provide a userID.');
+    }
+
+    if (!validate(userId)) {
+      throw new BadRequest(`Invalid uuid ${userId}`);
     }
 
     const userService = this.app.service('users') as UserService;
