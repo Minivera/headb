@@ -1,1 +1,3 @@
 /.encore
+.idea
+go.sum
