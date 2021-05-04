@@ -112,8 +112,8 @@ type CreateDocumentParams struct {
 	// The unique identifier for the collection this document should be added to
 	CollectionID uint64
 
-	// The content of the document (Stringified JSON for now)
-	Content string
+	// The content of the document
+	Content json.RawMessage
 }
 
 // CreateDocumentResponse is the result of creating a document
@@ -181,8 +181,8 @@ type UpdateDocumentParams struct {
 	// The unique identifier for the document
 	ID uint64
 
-	// The content of the document (Stringified JSON for now)
-	Content string
+	// The content of the document
+	Content json.RawMessage
 }
 
 // UpdateDocumentResponse is the result of updating a document for documents

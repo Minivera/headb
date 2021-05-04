@@ -11,8 +11,8 @@ type DocumentPayload struct {
 	// The document unique identifier
 	ID uint64
 
-	// The document content (Stringified JSON for now)
-	Content   string
+	// The document content
+	Content   json.RawMessage
 	UpdatedAt time.Time
 	CreatedAt time.Time
 }
@@ -25,7 +25,7 @@ func DocumentModelToPayload(document *models.Document) (DocumentPayload, error) 
 
 	return DocumentPayload{
 		ID:        document.ID,
-		Content:   string(contentString),
+		Content:   contentString,
 		UpdatedAt: document.UpdatedAt,
 		CreatedAt: document.CreatedAt,
 	}, nil
