@@ -1,4 +1,4 @@
-package common
+package helpers
 
 import (
 	"crypto/rand"
@@ -12,7 +12,7 @@ import (
 
 const (
 	ApiKeyLength    = 24
-	EncryptCost     = 14
+	EncryptCost     = 10
 	ApiKeySeparator = "."
 )
 
@@ -38,7 +38,7 @@ func GenerateSecureApiKey(key string) (string, error) {
 
 func MergeWithKeyID(key string, keyID uint64) string {
 	keyIDbase64 := base64.URLEncoding.EncodeToString([]byte(strconv.FormatUint(keyID, 10)))
-	return fmt.Sprintf("%s%s%s", key, ApiKeySeparator, keyIDbase64)
+	return fmt.Sprintf("%s%s%s", keyIDbase64, ApiKeySeparator, key)
 }
 
 func ExtractIDAndValue(mergedKey string) (string, uint64, error) {
@@ -47,7 +47,7 @@ func ExtractIDAndValue(mergedKey string) (string, uint64, error) {
 		return "", 0, fmt.Errorf("received API key was not a two part key")
 	}
 
-	keyIDbase64 := parts[1]
+	keyIDbase64 := parts[0]
 	keyIDString, err := base64.URLEncoding.DecodeString(keyIDbase64)
 	if err != nil {
 		return "", 0, err
@@ -58,7 +58,7 @@ func ExtractIDAndValue(mergedKey string) (string, uint64, error) {
 		return "", 0, err
 	}
 
-	return parts[0], keyID, nil
+	return parts[1], keyID, nil
 }
 
 func ValidateKey(plainKey, hashedKey string) error {

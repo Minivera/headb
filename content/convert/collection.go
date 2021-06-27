@@ -3,7 +3,7 @@ package convert
 import (
 	"time"
 
-	"encore.app/headb/models"
+	"encore.app/content/models"
 )
 
 type CollectionPayload struct {

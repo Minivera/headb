@@ -1,4 +1,4 @@
-package headb
+package content
 
 import (
 	"context"
@@ -9,8 +9,9 @@ import (
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
 
-	"encore.app/headb/convert"
-	"encore.app/headb/models"
+	"encore.app/content/convert"
+	"encore.app/content/models"
+	"encore.app/identity"
 )
 
 // ListCollectionsResponse Is the list of collections for the current user
@@ -22,7 +23,7 @@ type ListCollectionsResponse struct {
 // ListCollections lists all collections created by the authenticated user
 //encore:api auth
 func ListCollections(ctx context.Context) (*ListCollectionsResponse, error) {
-	userData := auth.Data().(*UserData)
+	userData := auth.Data().(*identity.UserData)
 
 	collections, err := models.ListCollections(ctx, userData.ID)
 	if err != nil {
@@ -52,7 +53,7 @@ type GetCollectionResponse struct {
 // GetCollection Finds a collection by ID
 //encore:api auth
 func GetCollection(ctx context.Context, params *GetCollectionParams) (*GetCollectionResponse, error) {
-	userData := auth.Data().(*UserData)
+	userData := auth.Data().(*identity.UserData)
 
 	collection, err := models.GetCollectionByID(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
@@ -90,7 +91,7 @@ type CreateCollectionResponse struct {
 // CreateCollection creates a collection for the authenticated user
 //encore:api auth
 func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*CreateCollectionResponse, error) {
-	userData := auth.Data().(*UserData)
+	userData := auth.Data().(*identity.UserData)
 
 	collection := models.NewCollection(params.Name, userData.ID)
 	if !collection.ValidateConstraint(ctx) {
@@ -135,7 +136,7 @@ type UpdateCollectionResponse struct {
 // UpdateCollection updates a collection by ID for the authenticated user
 //encore:api auth
 func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*UpdateCollectionResponse, error) {
-	userData := auth.Data().(*UserData)
+	userData := auth.Data().(*identity.UserData)
 
 	collection, err := models.GetCollectionByID(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
@@ -190,7 +191,7 @@ type DeleteCollectionResponse struct {
 // DeleteCollection deletes a collection by ID for the authenticated user
 //encore:api auth
 func DeleteCollection(ctx context.Context, params *DeleteCollectionParams) (*DeleteCollectionResponse, error) {
-	userData := auth.Data().(*UserData)
+	userData := auth.Data().(*identity.UserData)
 
 	collection, err := models.GetCollectionByID(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {

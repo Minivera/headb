@@ -1,16 +1,18 @@
-package headb
+package content
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 
+	"encore.app/identity"
+
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
 
-	"encore.app/headb/convert"
-	"encore.app/headb/models"
+	"encore.app/content/convert"
+	"encore.app/content/models"
 )
 
 // ListDocumentsParams is the parameters for listing the documents of a collection
@@ -28,7 +30,7 @@ type ListDocumentsResponse struct {
 // ListDocuments lists all documents created by the authenticated user for a given collection
 //encore:api auth
 func ListDocuments(ctx context.Context, params *ListDocumentsParams) (*ListDocumentsResponse, error) {
-	userData := auth.Data().(*UserData)
+	userData := auth.Data().(*identity.UserData)
 
 	collection, err := models.GetCollectionByID(ctx, params.CollectionID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
@@ -79,7 +81,7 @@ type GetDocumentResponse struct {
 // GetDocument finds a document by ID
 //encore:api auth
 func GetDocument(ctx context.Context, params *GetDocumentParams) (*GetDocumentResponse, error) {
-	userData := auth.Data().(*UserData)
+	userData := auth.Data().(*identity.UserData)
 
 	document, err := models.GetDocumentByUser(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
@@ -128,7 +130,7 @@ type CreateDocumentResponse struct {
 // CreateDocument creates a document for the authenticated user
 //encore:api auth
 func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateDocumentResponse, error) {
-	userData := auth.Data().(*UserData)
+	userData := auth.Data().(*identity.UserData)
 
 	collection, err := models.GetCollectionByID(ctx, params.CollectionID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
@@ -197,7 +199,7 @@ type UpdateDocumentResponse struct {
 // UpdateDocument updates a document by ID for the authenticated user
 //encore:api auth
 func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateDocumentResponse, error) {
-	userData := auth.Data().(*UserData)
+	userData := auth.Data().(*identity.UserData)
 
 	document, err := models.GetDocumentByUser(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
@@ -263,7 +265,7 @@ type DeleteDocumentResponse struct {
 // DeleteDocument deletes a document by ID for the authenticated user
 //encore:api auth
 func DeleteDocument(ctx context.Context, params *DeleteDocumentParams) (*DeleteDocumentResponse, error) {
-	userData := auth.Data().(*UserData)
+	userData := auth.Data().(*identity.UserData)
 
 	document, err := models.GetDocumentByUser(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {

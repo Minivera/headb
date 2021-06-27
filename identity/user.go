@@ -1,11 +1,11 @@
-package headb
+package identity
 
 import (
 	"context"
 
 	"encore.dev/beta/errs"
 
-	"encore.app/headb/models"
+	"encore.app/identity/models"
 )
 
 // SignInParams is the parameters required to create a user account
@@ -33,6 +33,6 @@ func SignIn(ctx context.Context, params *SignInParams) (*SignInResponse, error) 
 	}
 
 	return &SignInResponse{
-		Message: "Signed-in successfully, use the headb.GenerateApiKey endpoint to generate an API key",
+		Message: "Signed-in successfully, use the identity.GenerateApiKey endpoint to generate an API key",
 	}, nil
 }

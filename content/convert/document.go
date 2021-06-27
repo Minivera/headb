@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"encore.app/headb/models"
+	"encore.app/content/models"
 )
 
 type DocumentPayload struct {

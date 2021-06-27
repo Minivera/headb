@@ -1,17 +1,16 @@
-package headb
+package identity
 
 import (
 	"context"
 	"errors"
-
-	common2 "encore.app/headb/common"
 
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
 	log "github.com/sirupsen/logrus"
 
-	"encore.app/headb/models"
+	"encore.app/identity/helpers"
+	"encore.app/identity/models"
 )
 
 // GenerateApiKeyParams is the parameters for generating an API key
@@ -37,7 +36,7 @@ func GenerateApiKey(ctx context.Context, params *GenerateApiKeyParams) (*Generat
 	if errors.Is(err, sqldb.ErrNoRows) {
 		return nil, &errs.Error{
 			Code:    errs.NotFound,
-			Message: "Could not find user for username, did you forget to run headb.SignIn?",
+			Message: "Could not find user for username, did you forget to run identity.SignIn?",
 		}
 	} else if err != nil {
 		return nil, &errs.Error{
@@ -46,7 +45,7 @@ func GenerateApiKey(ctx context.Context, params *GenerateApiKeyParams) (*Generat
 		}
 	}
 
-	apiKey, err := common2.GenerateApiKey()
+	apiKey, err := helpers.GenerateApiKey()
 	if err != nil {
 		log.Errorf("Could not generate API key, %v", err)
 		return nil, &errs.Error{
@@ -55,7 +54,7 @@ func GenerateApiKey(ctx context.Context, params *GenerateApiKeyParams) (*Generat
 		}
 	}
 
-	hashedKey, err := common2.GenerateSecureApiKey(apiKey)
+	hashedKey, err := helpers.GenerateSecureApiKey(apiKey)
 	if err != nil {
 		log.Errorf("Could not generate API secure key to save in the database, %v", err)
 		return nil, &errs.Error{
@@ -73,9 +72,79 @@ func GenerateApiKey(ctx context.Context, params *GenerateApiKeyParams) (*Generat
 		}
 	}
 
+	// TODO: Merging the key with the ID is not a great idea, we should try to use a better
+	// method to authenticate users with an API key. Maybe JWTs?
 	return &GenerateApiKeyResponse{
 		Message: "Generated new API key for this user, we will not show this value again. Make sure to save it.",
-		ApiKey:  common2.MergeWithKeyID(apiKey, keyRecord.ID),
+		ApiKey:  helpers.MergeWithKeyID(apiKey, keyRecord.ID),
+	}, nil
+}
+
+// GetUserForApiKeyInternalParams is the parameters for fetching an user for authentication between
+// services using an API key.
+type GetUserForApiKeyInternalParams struct {
+	// The API key used for authentication
+	KeyString string
+}
+
+// GetUserForApiKeyInternalResponse is the result of fetching the user using an API key.
+type GetUserForApiKeyInternalResponse struct {
+	// The unique identifier of the key given in the request, for later use.
+	KeyID uint64
+
+	// The fetched user identified for this API key.
+	User *models.User
+}
+
+// GetUserForApiKeyInternal finds the user for a given API key, given that it is valid and the
+// user can access it.
+//encore:api private
+func GetUserForApiKeyInternal(ctx context.Context, params *GetUserForApiKeyInternalParams) (*GetUserForApiKeyInternalResponse, error) {
+	keyValue, keyID, err := helpers.ExtractIDAndValue(params.KeyString)
+	if err != nil {
+		return nil, &errs.Error{
+			Code:    errs.InvalidArgument,
+			Message: "Could not parse API key",
+		}
+	}
+
+	apiKey, err := models.GetApiKey(ctx, keyID)
+	if errors.Is(err, sqldb.ErrNoRows) {
+		return nil, &errs.Error{
+			Code:    errs.NotFound,
+			Message: "Could not find API key",
+		}
+	} else if err != nil {
+		return nil, &errs.Error{
+			Code:    errs.Internal,
+			Message: "Could not find API key",
+		}
+	}
+
+	err = helpers.ValidateKey(keyValue, apiKey.Value)
+	if err != nil {
+		return nil, &errs.Error{
+			Code:    errs.Unauthenticated,
+			Message: "Could not validate API key with given key",
+		}
+	}
+
+	user, err := models.GetUserByID(ctx, apiKey.UserID)
+	if errors.Is(err, sqldb.ErrNoRows) {
+		return nil, &errs.Error{
+			Code:    errs.NotFound,
+			Message: "Could not find user for API key",
+		}
+	} else if err != nil {
+		return nil, &errs.Error{
+			Code:    errs.Internal,
+			Message: "Could not find user for API key",
+		}
+	}
+
+	return &GetUserForApiKeyInternalResponse{
+		KeyID: keyID,
+		User:  user,
 	}, nil
 }
 
