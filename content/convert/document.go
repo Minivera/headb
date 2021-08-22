@@ -7,6 +7,7 @@ import (
 	"encore.app/content/models"
 )
 
+// DocumentPayload is an API safe representation of a document.
 type DocumentPayload struct {
 	// The document unique identifier
 	ID uint64
@@ -17,6 +18,8 @@ type DocumentPayload struct {
 	CreatedAt time.Time
 }
 
+// DocumentModelToPayload converts a database representation of a Document
+// to an API safe version.
 func DocumentModelToPayload(document *models.Document) (DocumentPayload, error) {
 	contentString, err := json.Marshal(document.Content)
 	if err != nil {
@@ -31,6 +34,8 @@ func DocumentModelToPayload(document *models.Document) (DocumentPayload, error) 
 	}, nil
 }
 
+// DocumentModelsToPayloads converts multiple document models to their API save versions
+// using DocumentModelToPayload.
 func DocumentModelsToPayloads(documents []*models.Document) ([]DocumentPayload, error) {
 	converted := make([]DocumentPayload, len(documents))
 	for i, document := range documents {

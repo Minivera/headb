@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"encore.app/identity"
+	log "github.com/sirupsen/logrus"
 
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
@@ -13,6 +13,7 @@ import (
 
 	"encore.app/content/convert"
 	"encore.app/content/models"
+	"encore.app/identity"
 )
 
 // ListDocumentsParams is the parameters for listing the documents of a collection
@@ -34,11 +35,13 @@ func ListDocuments(ctx context.Context, params *ListDocumentsParams) (*ListDocum
 
 	collection, err := models.GetCollectionByID(ctx, params.CollectionID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
+		log.WithError(err).Warning("Could not find collection by ID for document")
 		return nil, &errs.Error{
 			Code:    errs.NotFound,
 			Message: "Could not find collection",
 		}
 	} else if err != nil {
+		log.WithError(err).Error("Could not find collection for document")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not find collection, unknown error",
@@ -47,6 +50,7 @@ func ListDocuments(ctx context.Context, params *ListDocumentsParams) (*ListDocum
 
 	documents, err := models.ListDocuments(ctx, collection.ID)
 	if err != nil {
+		log.WithError(err).Error("Could not fetch documents for collection")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not fetch documents",
@@ -55,6 +59,7 @@ func ListDocuments(ctx context.Context, params *ListDocumentsParams) (*ListDocum
 
 	payload, err := convert.DocumentModelsToPayloads(documents)
 	if err != nil {
+		log.WithError(err).Error("Could not convert documents to API safe version")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not convert documents for API",
@@ -85,11 +90,13 @@ func GetDocument(ctx context.Context, params *GetDocumentParams) (*GetDocumentRe
 
 	document, err := models.GetDocumentByUser(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
+		log.WithError(err).Warning("Could not find document by ID")
 		return nil, &errs.Error{
 			Code:    errs.NotFound,
 			Message: "Could not find document",
 		}
 	} else if err != nil {
+		log.WithError(err).Error("Could not find document")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not find document, unknown error",
@@ -98,6 +105,7 @@ func GetDocument(ctx context.Context, params *GetDocumentParams) (*GetDocumentRe
 
 	payload, err := convert.DocumentModelToPayload(document)
 	if err != nil {
+		log.WithError(err).Error("Could not convert documents to API safe version")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not convert document for API",
@@ -134,11 +142,13 @@ func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateD
 
 	collection, err := models.GetCollectionByID(ctx, params.CollectionID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
+		log.WithError(err).Warning("Could not find collection by ID for document")
 		return nil, &errs.Error{
 			Code:    errs.NotFound,
 			Message: "Could not find collection",
 		}
 	} else if err != nil {
+		log.WithError(err).Error("Could not find collection for document")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not find collection, unknown error",
@@ -146,8 +156,9 @@ func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateD
 	}
 
 	var content map[string]interface{}
-	err = json.Unmarshal([]byte(params.Content), &content)
+	err = json.Unmarshal(params.Content, &content)
 	if err != nil {
+		log.WithError(err).Warning("Could not validate JSON on document request")
 		return nil, &errs.Error{
 			Code:    errs.InvalidArgument,
 			Message: "Received JSON string for content was not valid",
@@ -158,6 +169,7 @@ func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateD
 
 	err = document.Save(ctx)
 	if err != nil {
+		log.WithError(err).Error("Could not save document")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not save document",
@@ -166,6 +178,7 @@ func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateD
 
 	payload, err := convert.DocumentModelToPayload(document)
 	if err != nil {
+		log.WithError(err).Error("Could not convert document to API safe version")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not convert document for API",
@@ -203,11 +216,13 @@ func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateD
 
 	document, err := models.GetDocumentByUser(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
+		log.WithError(err).Warning("Could not find document by ID")
 		return nil, &errs.Error{
 			Code:    errs.NotFound,
 			Message: "Could not find document",
 		}
 	} else if err != nil {
+		log.WithError(err).Error("Could not find document")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not find document, unknown error",
@@ -215,8 +230,9 @@ func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateD
 	}
 
 	var content map[string]interface{}
-	err = json.Unmarshal([]byte(params.Content), &content)
+	err = json.Unmarshal(params.Content, &content)
 	if err != nil {
+		log.WithError(err).Warning("Could not validate JSON on document request")
 		return nil, &errs.Error{
 			Code:    errs.InvalidArgument,
 			Message: "Received JSON string for content was not valid",
@@ -227,6 +243,7 @@ func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateD
 
 	err = document.Save(ctx)
 	if err != nil {
+		log.WithError(err).Error("Could not save document")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not save document",
@@ -235,6 +252,7 @@ func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateD
 
 	payload, err := convert.DocumentModelToPayload(document)
 	if err != nil {
+		log.WithError(err).Error("Could not convert document to API safe version")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not convert document for API",
@@ -269,11 +287,13 @@ func DeleteDocument(ctx context.Context, params *DeleteDocumentParams) (*DeleteD
 
 	document, err := models.GetDocumentByUser(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
+		log.WithError(err).Warning("Could not fetch document by ID")
 		return nil, &errs.Error{
 			Code:    errs.NotFound,
 			Message: "Could not find document",
 		}
 	} else if err != nil {
+		log.WithError(err).Error("Could not fetch document")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not find document, unknown error",
@@ -282,6 +302,7 @@ func DeleteDocument(ctx context.Context, params *DeleteDocumentParams) (*DeleteD
 
 	err = document.Delete(ctx)
 	if err != nil {
+		log.WithError(err).Error("Could not delete document")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not delete document",

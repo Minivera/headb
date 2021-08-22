@@ -4,6 +4,8 @@ import (
 	"context"
 	"strconv"
 
+	"encore.app/identity/models"
+
 	"encore.dev/beta/auth"
 	log "github.com/sirupsen/logrus"
 )
@@ -23,7 +25,16 @@ func AuthHandler(ctx context.Context, token string) (auth.UID, *UserData, error)
 		KeyString: token,
 	})
 	if err != nil || response == nil {
-		log.Errorf("Failed to authenticate user, %v", err)
+		log.WithError(err).Warning("Failed to authenticate user")
+		return "", nil, nil
+	}
+
+	if response.User.Status == models.UserStatusPending {
+		log.Warning("Authentication failed, user is still pending")
+		return "", nil, nil
+	}
+	if response.User.Status == models.UserStatusDenied {
+		log.Warning("Authentication failed, user is still pending")
 		return "", nil, nil
 	}
 

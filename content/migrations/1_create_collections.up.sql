@@ -3,8 +3,7 @@ CREATE TABLE "collections" (
     name VARCHAR(255) NOT NULL,
     user_id BIGSERIAL NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT fk_user FOREIGN KEY(user_id) REFERENCES "identity"."users"(id) ON DELETE CASCADE
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE UNIQUE INDEX collections_user_id_name_unique_index ON "collections"(name, user_id);

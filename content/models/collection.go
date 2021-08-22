@@ -8,6 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Collection is a struct that mirrors the collection table
+// from the database.
 type Collection struct {
 	ID        uint64
 	Name      string
@@ -16,6 +18,8 @@ type Collection struct {
 	CreatedAt time.Time
 }
 
+// NewCollection generates a new collection structure from a name and the
+// associated user ID.
 func NewCollection(name string, userID uint64) *Collection {
 	return &Collection{
 		Name:   name,
@@ -23,6 +27,8 @@ func NewCollection(name string, userID uint64) *Collection {
 	}
 }
 
+// ListCollections lists all collections for a given user, it returns
+// a nil collection on an error.
 func ListCollections(ctx context.Context, UserID uint64) ([]*Collection, error) {
 	collectionQuery := `
 		SELECT
@@ -40,7 +46,7 @@ func ListCollections(ctx context.Context, UserID uint64) ([]*Collection, error) 
 	var collections []*Collection
 	rows, err := sqldb.Query(ctx, collectionQuery, UserID)
 	if err != nil {
-		log.Errorf("Could not query collections, %v", err)
+		log.WithError(err).Error("Could not query collections")
 		return nil, err
 	}
 
@@ -49,7 +55,7 @@ func ListCollections(ctx context.Context, UserID uint64) ([]*Collection, error) 
 
 		err = rows.Scan(&collection.ID, &collection.Name, &collection.UserID, &collection.UpdatedAt, &collection.CreatedAt)
 		if err != nil {
-			log.Errorf("Could not scan collections, %v", err)
+			log.WithError(err).Error("Could not scan collections")
 			return nil, err
 		}
 
@@ -59,6 +65,8 @@ func ListCollections(ctx context.Context, UserID uint64) ([]*Collection, error) 
 	return collections, nil
 }
 
+// GetCollectionByID fetches a single collection record given an ID and the associated
+// user ID. Returns nil on an error.
 func GetCollectionByID(ctx context.Context, ID, UserID uint64) (*Collection, error) {
 	collectionQuery := `
 		SELECT
@@ -80,13 +88,15 @@ func GetCollectionByID(ctx context.Context, ID, UserID uint64) (*Collection, err
 		Scan(&collection.ID, &collection.Name, &collection.UserID, &collection.UpdatedAt, &collection.CreatedAt)
 
 	if err != nil {
-		log.Errorf("Could not query collection for id %v, %v", ID, err)
+		log.WithError(err).Errorf("Could not query collection for id %d", ID)
 		return nil, err
 	}
 
 	return &collection, nil
 }
 
+// ValidateConstraint validates that no collection with the same name exists
+// for a single user.
 func (collection *Collection) ValidateConstraint(ctx context.Context) bool {
 	collectionQuery := `
 		SELECT
@@ -101,13 +111,16 @@ func (collection *Collection) ValidateConstraint(ctx context.Context) bool {
 	id := 0
 	err := sqldb.QueryRow(ctx, collectionQuery, collection.Name, collection.UserID).Scan(&id)
 	if err == nil && id != 0 {
-		log.Errorf("Tried to save collection, a collection already exists for this name and user_id")
+		log.Warning("Tried to save collection, a collection already exists for this name and user_id")
 		return false
 	}
 
 	return true
 }
 
+// Save saves the data of the collection it used on. This method only saves
+// the name and user ID from the struct and updates the timestamps. Save will
+// trigger an error if the constraints are not respected.
 func (collection *Collection) Save(ctx context.Context) error {
 	if collection.ID == 0 {
 		collectionQuery := `
@@ -121,7 +134,7 @@ func (collection *Collection) Save(ctx context.Context) error {
 			Scan(&collection.ID, &collection.UpdatedAt, &collection.CreatedAt)
 
 		if err != nil {
-			log.Errorf("Could not insert collection, %v", err)
+			log.WithError(err).Error("Could not insert collection")
 			return err
 		}
 
@@ -140,13 +153,14 @@ func (collection *Collection) Save(ctx context.Context) error {
 		Scan(&collection.ID, &collection.UpdatedAt, &collection.CreatedAt)
 
 	if err != nil {
-		log.Errorf("Could not update collection, %v", err)
+		log.WithError(err).Error("Could not update collection")
 		return err
 	}
 
 	return nil
 }
 
+// Delete deletes the Collection is it called on.
 func (collection *Collection) Delete(ctx context.Context) error {
 	collectionQuery := `
 		DELETE FROM "collections"
@@ -158,7 +172,7 @@ func (collection *Collection) Delete(ctx context.Context) error {
 	err := sqldb.QueryRow(ctx, collectionQuery, collection.ID).Scan(&deletedID)
 
 	if err != nil || deletedID == 0 {
-		log.Errorf("Could not delete collection, %v", err)
+		log.WithError(err).Error("Could not delete collection")
 		return err
 	}
 

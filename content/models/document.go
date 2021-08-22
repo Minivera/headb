@@ -8,6 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// Document is a struct that mirrors the collection table
+// from the database.
 type Document struct {
 	ID           uint64
 	Content      map[string]interface{}
@@ -16,13 +18,17 @@ type Document struct {
 	CreatedAt    time.Time
 }
 
-func NewDocument(content map[string]interface{}, documentID uint64) *Document {
+// NewDocument generates a new Document structure using the given content for
+// a specific collection.
+func NewDocument(content map[string]interface{}, collectionID uint64) *Document {
 	return &Document{
 		Content:      content,
-		CollectionID: documentID,
+		CollectionID: collectionID,
 	}
 }
 
+// ListDocuments lists all documents for a given collection, returning an empty slice
+// on an error.
 func ListDocuments(ctx context.Context, CollectionID uint64) ([]*Document, error) {
 	documentQuery := `
 		SELECT
@@ -40,7 +46,7 @@ func ListDocuments(ctx context.Context, CollectionID uint64) ([]*Document, error
 	var documents []*Document
 	rows, err := sqldb.Query(ctx, documentQuery, CollectionID)
 	if err != nil {
-		log.Errorf("Could not query documents, %v", err)
+		log.WithError(err).Error("Could not query documents")
 		return nil, err
 	}
 
@@ -49,7 +55,7 @@ func ListDocuments(ctx context.Context, CollectionID uint64) ([]*Document, error
 
 		err = rows.Scan(&document.ID, &document.Content, &document.CollectionID, &document.UpdatedAt, &document.CreatedAt)
 		if err != nil {
-			log.Errorf("Could not scan documents, %v", err)
+			log.WithError(err).Error("Could not scan documents")
 			return nil, err
 		}
 
@@ -59,6 +65,8 @@ func ListDocuments(ctx context.Context, CollectionID uint64) ([]*Document, error
 	return documents, nil
 }
 
+// GetDocumentByUser fetches a single document record given an ID and the associated
+// user ID of the collection this document belongs to. Returns nil on an error.
 func GetDocumentByUser(ctx context.Context, ID, UserID uint64) (*Document, error) {
 	documentQuery := `
 		SELECT
@@ -81,13 +89,16 @@ func GetDocumentByUser(ctx context.Context, ID, UserID uint64) (*Document, error
 		Scan(&document.ID, &document.Content, &document.CollectionID, &document.UpdatedAt, &document.CreatedAt)
 
 	if err != nil {
-		log.Errorf("Could not query document for id %v, %v", ID, err)
+		log.WithError(err).Errorf("Could not query document for id %v", ID)
 		return nil, err
 	}
 
 	return &document, nil
 }
 
+// Save saves the data of the document it used on. This method only saves
+// the content and collection ID from the struct and updates the timestamps. Save will
+// trigger an error if the constraints are not respected.
 func (document *Document) Save(ctx context.Context) error {
 	if document.ID == 0 {
 		documentQuery := `
@@ -101,7 +112,7 @@ func (document *Document) Save(ctx context.Context) error {
 			Scan(&document.ID, &document.UpdatedAt, &document.CreatedAt)
 
 		if err != nil {
-			log.Errorf("Could not insert document, %v", err)
+			log.WithError(err).Error("Could not insert document")
 			return err
 		}
 
@@ -120,13 +131,14 @@ func (document *Document) Save(ctx context.Context) error {
 		Scan(&document.ID, &document.UpdatedAt, &document.CreatedAt)
 
 	if err != nil {
-		log.Errorf("Could not update document, %v", err)
+		log.WithError(err).Error("Could not update document")
 		return err
 	}
 
 	return nil
 }
 
+// Delete deletes the Document is it called on.
 func (document *Document) Delete(ctx context.Context) error {
 	documentQuery := `
 		DELETE FROM "documents"
@@ -138,7 +150,7 @@ func (document *Document) Delete(ctx context.Context) error {
 	err := sqldb.QueryRow(ctx, documentQuery, document.ID).Scan(&deletedID)
 
 	if err != nil || deletedID == 0 {
-		log.Errorf("Could not delete document, %v", err)
+		log.WithError(err).Error("Could not delete document")
 		return err
 	}
 

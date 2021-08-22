@@ -8,6 +8,7 @@ import (
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
+	log "github.com/sirupsen/logrus"
 
 	"encore.app/content/convert"
 	"encore.app/content/models"
@@ -27,6 +28,7 @@ func ListCollections(ctx context.Context) (*ListCollectionsResponse, error) {
 
 	collections, err := models.ListCollections(ctx, userData.ID)
 	if err != nil {
+		log.WithError(err).Warning("Could not fetch collections for this user")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not fetch collections",
@@ -57,11 +59,13 @@ func GetCollection(ctx context.Context, params *GetCollectionParams) (*GetCollec
 
 	collection, err := models.GetCollectionByID(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
+		log.WithError(err).Warning("Could not collection by ID")
 		return nil, &errs.Error{
 			Code:    errs.NotFound,
 			Message: "Could not find collection",
 		}
 	} else if err != nil {
+		log.WithError(err).Error("Could not fetch collection")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not find collection, unknown error",
@@ -95,6 +99,10 @@ func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*Cre
 
 	collection := models.NewCollection(params.Name, userData.ID)
 	if !collection.ValidateConstraint(ctx) {
+		log.WithFields(map[string]interface{}{
+			"name":    params.Name,
+			"user_id": userData.ID,
+		}).Warning("Could not validate the constraints for collection, a collection already exists.")
 		return nil, &errs.Error{
 			Code:    errs.AlreadyExists,
 			Message: fmt.Sprintf("A collection with name `%s` already exists for this user", collection.Name),
@@ -103,6 +111,7 @@ func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*Cre
 
 	err := collection.Save(ctx)
 	if err != nil {
+		log.WithError(err).Error("Could not save collections for this user")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not save collection",
@@ -140,11 +149,13 @@ func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*Upd
 
 	collection, err := models.GetCollectionByID(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
+		log.WithError(err).Warning("Could not fetch collection by ID")
 		return nil, &errs.Error{
 			Code:    errs.NotFound,
 			Message: "Could not find collection",
 		}
 	} else if err != nil {
+		log.WithError(err).Error("Could not fetch collection")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not find collection, unknown error",
@@ -153,6 +164,10 @@ func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*Upd
 
 	collection.Name = params.Name
 	if !collection.ValidateConstraint(ctx) {
+		log.WithFields(map[string]interface{}{
+			"name":    params.Name,
+			"user_id": userData.ID,
+		}).Warning("Could not validate the constraints for collection, a collection already exists.")
 		return nil, &errs.Error{
 			Code:    errs.AlreadyExists,
 			Message: fmt.Sprintf("A collection with name `%s` already exists for this user", collection.Name),
@@ -161,6 +176,7 @@ func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*Upd
 
 	err = collection.Save(ctx)
 	if err != nil {
+		log.WithError(err).Error("Could not save collection")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not save collection",
@@ -195,11 +211,13 @@ func DeleteCollection(ctx context.Context, params *DeleteCollectionParams) (*Del
 
 	collection, err := models.GetCollectionByID(ctx, params.ID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
+		log.WithError(err).Warning("Could not fetch collection by ID")
 		return nil, &errs.Error{
 			Code:    errs.NotFound,
 			Message: "Could not find collection",
 		}
 	} else if err != nil {
+		log.WithError(err).Error("Could not fetch collection")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not find collection, unknown error",
@@ -208,6 +226,7 @@ func DeleteCollection(ctx context.Context, params *DeleteCollectionParams) (*Del
 
 	err = collection.Delete(ctx)
 	if err != nil {
+		log.WithError(err).Error("Could not delete collection")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not delete collection",
