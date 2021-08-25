@@ -4,16 +4,16 @@ import (
 	"context"
 	"strconv"
 
-	"encore.app/identity/models"
-
 	"encore.dev/beta/auth"
 	log "github.com/sirupsen/logrus"
+
+	"encore.app/identity/models/generated/identity/public/model"
 )
 
 // UserData is the data containing the relevant information about the logged in user.
 type UserData struct {
-	KeyID    uint64
-	ID       uint64
+	KeyID    int64
+	ID       int64
 	Username string
 	Token    string
 }
@@ -29,19 +29,19 @@ func AuthHandler(ctx context.Context, token string) (auth.UID, *UserData, error)
 		return "", nil, nil
 	}
 
-	if response.User.Status == models.UserStatusPending {
+	if response.User.Status == model.UserStatus_Pending {
 		log.Warning("Authentication failed, user is still pending")
 		return "", nil, nil
 	}
-	if response.User.Status == models.UserStatusDenied {
+	if response.User.Status == model.UserStatus_Denied {
 		log.Warning("Authentication failed, user is still pending")
 		return "", nil, nil
 	}
 
-	return auth.UID(strconv.FormatUint(response.User.ID, 10)), &UserData{
+	return auth.UID(strconv.FormatInt(response.User.ID, 10)), &UserData{
 		KeyID:    response.KeyID,
 		ID:       response.User.ID,
-		Token:    response.User.Token,
-		Username: response.User.Username,
+		Token:    *response.User.Token,
+		Username: *response.User.Username,
 	}, nil
 }

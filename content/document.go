@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 
-	log "github.com/sirupsen/logrus"
-
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
+	log "github.com/sirupsen/logrus"
 
 	"encore.app/content/convert"
 	"encore.app/content/models"
@@ -19,7 +18,7 @@ import (
 // ListDocumentsParams is the parameters for listing the documents of a collection
 type ListDocumentsParams struct {
 	// The unique identifier of the collection
-	CollectionID uint64
+	CollectionID int64
 }
 
 // ListDocumentsResponse is the list of documents for the current user and identified collection
@@ -74,7 +73,7 @@ func ListDocuments(ctx context.Context, params *ListDocumentsParams) (*ListDocum
 // GetDocumentParams is the parameters for finding a document by ID
 type GetDocumentParams struct {
 	// The unique identifier of the document
-	ID uint64
+	ID int64
 }
 
 // GetDocumentResponse is the result of having fetched a document
@@ -120,7 +119,7 @@ func GetDocument(ctx context.Context, params *GetDocumentParams) (*GetDocumentRe
 // CreateDocumentParams is the parameters for creating a document in a collection
 type CreateDocumentParams struct {
 	// The unique identifier for the collection this document should be added to
-	CollectionID uint64
+	CollectionID int64
 
 	// The content of the document
 	Content json.RawMessage
@@ -165,9 +164,9 @@ func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateD
 		}
 	}
 
-	document := models.NewDocument(content, collection.ID)
+	document := models.NewDocument(string(params.Content), collection.ID)
 
-	err = document.Save(ctx)
+	err = models.SaveDocument(ctx, document)
 	if err != nil {
 		log.WithError(err).Error("Could not save document")
 		return nil, &errs.Error{
@@ -194,7 +193,7 @@ func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateD
 // UpdateDocumentParams is the parameters for updating a document
 type UpdateDocumentParams struct {
 	// The unique identifier for the document
-	ID uint64
+	ID int64
 
 	// The content of the document
 	Content json.RawMessage
@@ -239,9 +238,9 @@ func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateD
 		}
 	}
 
-	document.Content = content
+	document.Content = string(params.Content)
 
-	err = document.Save(ctx)
+	err = models.SaveDocument(ctx, document)
 	if err != nil {
 		log.WithError(err).Error("Could not save document")
 		return nil, &errs.Error{
@@ -268,7 +267,7 @@ func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateD
 // DeleteDocumentParams is the parameters for deleting a document
 type DeleteDocumentParams struct {
 	// The unique identifier for the document
-	ID uint64
+	ID int64
 }
 
 // DeleteDocumentResponse is the result of deleting a document for documents
@@ -300,7 +299,7 @@ func DeleteDocument(ctx context.Context, params *DeleteDocumentParams) (*DeleteD
 		}
 	}
 
-	err = document.Delete(ctx)
+	err = models.DeleteDocument(ctx, document)
 	if err != nil {
 		log.WithError(err).Error("Could not delete document")
 		return nil, &errs.Error{

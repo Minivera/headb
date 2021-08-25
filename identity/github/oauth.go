@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"encore.app/identity/models/generated/identity/public/model"
+
 	"github.com/google/go-github/github"
 	log "github.com/sirupsen/logrus"
 
@@ -208,7 +210,7 @@ func GetUserInfo(ctx context.Context, accessToken string) (github.User, error) {
 
 // HandleDeviceCodePolling handles the flow of polling the OAuth provider for an OAuth
 // access token.
-func HandleDeviceCodePolling(ctx context.Context, user *models.User,
+func HandleDeviceCodePolling(ctx context.Context, user *model.Users,
 	deviceCode DeviceCodeResponse, clientID, secretKey string) {
 
 	currentTime := time.Now()
@@ -230,9 +232,9 @@ func HandleDeviceCodePolling(ctx context.Context, user *models.User,
 			case errors.Is(err, ErrAccessDenied) ||
 				errors.Is(err, ErrExpiredToken):
 				// If the request was denied, set the user to denied then cancel
-				user.Status = models.UserStatusDenied
+				user.Status = model.UserStatus_Denied
 
-				err = user.Save(ctx)
+				err = models.SaveUser(ctx, user)
 				if err != nil {
 					log.WithError(err).Error("Could not save user in the database.")
 					dropUser(ctx, user)
@@ -269,16 +271,17 @@ func HandleDeviceCodePolling(ctx context.Context, user *models.User,
 		existingUser, _ := models.GetUserByUniqueID(ctx, *userInfo.NodeID)
 		// Make sure to not create duplicates if this is a reauth
 		if existingUser != nil {
+			// TODO: Transfer the API keys of this user to the existing user, otherwise it gets deleted.
 			dropUser(ctx, user)
 			user = existingUser
 		}
 
-		user.Token = token
-		user.Username = *userInfo.Login
-		user.UniqueID = *userInfo.NodeID
-		user.Status = models.UserStatusAccepted
+		user.Token = &token
+		user.Username = userInfo.Login
+		user.UniqueID = userInfo.NodeID
+		user.Status = model.UserStatus_Accepted
 
-		err = user.Save(ctx)
+		err = models.SaveUser(ctx, user)
 		if err != nil {
 			log.WithError(err).Error("Could not save user in the database, user record may be corrupted.")
 		}
@@ -286,8 +289,8 @@ func HandleDeviceCodePolling(ctx context.Context, user *models.User,
 	}
 }
 
-func dropUser(ctx context.Context, user *models.User) {
-	err := user.Delete(ctx)
+func dropUser(ctx context.Context, user *model.Users) {
+	err := models.DeleteUser(ctx, user)
 	if err != nil {
 		log.WithError(err).Error("Could not drop user")
 	}

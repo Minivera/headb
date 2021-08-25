@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"encore.app/identity/helpers"
-
-	"encore.app/identity/github"
-	"encore.app/identity/models"
-
 	"encore.dev/beta/errs"
 	log "github.com/sirupsen/logrus"
+
+	"encore.app/identity/github"
+	"encore.app/identity/helpers"
+	"encore.app/identity/models"
 )
 
 var secrets struct {
@@ -44,7 +43,7 @@ func SignIn(ctx context.Context) (*SignInResponse, error) {
 	}
 
 	user := models.NewPendingUser()
-	err = user.Save(ctx)
+	err = models.SaveUser(ctx, user)
 	if err != nil {
 		log.WithError(err).Error("Could not save the temporary user record")
 		return nil, &errs.Error{

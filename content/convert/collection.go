@@ -3,13 +3,13 @@ package convert
 import (
 	"time"
 
-	"encore.app/content/models"
+	"encore.app/content/models/generated/content/public/model"
 )
 
 // CollectionPayload is an API safe version of a collection.
 type CollectionPayload struct {
 	// The collection unique identifier
-	ID uint64
+	ID int64
 
 	// The collection unique name
 	Name      string
@@ -19,7 +19,7 @@ type CollectionPayload struct {
 
 // CollectionModelToPayload converts a database representation of a Collection
 // to an API safe version.
-func CollectionModelToPayload(collection *models.Collection) CollectionPayload {
+func CollectionModelToPayload(collection *model.Collections) CollectionPayload {
 	return CollectionPayload{
 		ID:        collection.ID,
 		Name:      collection.Name,
@@ -30,7 +30,7 @@ func CollectionModelToPayload(collection *models.Collection) CollectionPayload {
 
 // CollectionModelsToPayloads converts multiple collection models to their API save versions
 // using CollectionModelToPayload.
-func CollectionModelsToPayloads(collections []*models.Collection) []CollectionPayload {
+func CollectionModelsToPayloads(collections []*model.Collections) []CollectionPayload {
 	converted := make([]CollectionPayload, len(collections))
 	for i, collection := range collections {
 		converted[i] = CollectionModelToPayload(collection)

@@ -2,26 +2,19 @@ package models
 
 import (
 	"context"
-	"time"
 
 	"encore.dev/storage/sqldb"
+	"github.com/go-jet/jet/v2/postgres"
 	log "github.com/sirupsen/logrus"
-)
 
-// Document is a struct that mirrors the collection table
-// from the database.
-type Document struct {
-	ID           uint64
-	Content      map[string]interface{}
-	CollectionID uint64
-	UpdatedAt    time.Time
-	CreatedAt    time.Time
-}
+	"encore.app/content/models/generated/content/public/model"
+	"encore.app/content/models/generated/content/public/table"
+)
 
 // NewDocument generates a new Document structure using the given content for
 // a specific collection.
-func NewDocument(content map[string]interface{}, collectionID uint64) *Document {
-	return &Document{
+func NewDocument(content string, collectionID int64) *model.Documents {
+	return &model.Documents{
 		Content:      content,
 		CollectionID: collectionID,
 	}
@@ -29,31 +22,34 @@ func NewDocument(content map[string]interface{}, collectionID uint64) *Document 
 
 // ListDocuments lists all documents for a given collection, returning an empty slice
 // on an error.
-func ListDocuments(ctx context.Context, CollectionID uint64) ([]*Document, error) {
-	documentQuery := `
-		SELECT
-			id,
-			content,
-			collection_id,
-			updated_at,
-			created_at
-		FROM
-			"documents"
-		WHERE
-			documents.collection_id = $1;
-	`
+func ListDocuments(ctx context.Context, CollectionID int64) ([]*model.Documents, error) {
+	query, args := postgres.SELECT(
+		table.Documents.ID,
+		table.Documents.Content,
+		table.Documents.CollectionID,
+		table.Documents.UpdatedAt,
+		table.Documents.CreatedAt,
+	).FROM(table.Documents).WHERE(
+		table.Documents.CollectionID.EQ(postgres.Int64(CollectionID)),
+	).Sql()
 
-	var documents []*Document
-	rows, err := sqldb.Query(ctx, documentQuery, CollectionID)
+	var documents []*model.Documents
+	rows, err := sqldb.Query(ctx, query, args...)
 	if err != nil {
 		log.WithError(err).Error("Could not query documents")
 		return nil, err
 	}
 
 	for rows.Next() {
-		document := &Document{}
+		document := &model.Documents{}
 
-		err = rows.Scan(&document.ID, &document.Content, &document.CollectionID, &document.UpdatedAt, &document.CreatedAt)
+		err = rows.Scan(
+			&document.ID,
+			&document.Content,
+			&document.CollectionID,
+			&document.UpdatedAt,
+			&document.CreatedAt,
+		)
 		if err != nil {
 			log.WithError(err).Error("Could not scan documents")
 			return nil, err
@@ -67,26 +63,33 @@ func ListDocuments(ctx context.Context, CollectionID uint64) ([]*Document, error
 
 // GetDocumentByUser fetches a single document record given an ID and the associated
 // user ID of the collection this document belongs to. Returns nil on an error.
-func GetDocumentByUser(ctx context.Context, ID, UserID uint64) (*Document, error) {
-	documentQuery := `
-		SELECT
-			documents.id,
-			content,
-			collection_id,
-			documents.updated_at,
-			documents.created_at
-		FROM
-			"documents"
-		LEFT JOIN "collections" ON documents.collection_id = collections.id AND collections.user_id = $2
-		WHERE
-			documents.id = $1
-		LIMIT 1;
-	`
+func GetDocumentByUser(ctx context.Context, ID, UserID int64) (*model.Documents, error) {
+	query, args := postgres.SELECT(
+		table.Documents.ID,
+		table.Documents.Content,
+		table.Documents.CollectionID,
+		table.Documents.UpdatedAt,
+		table.Documents.CreatedAt,
+	).FROM(
+		table.Documents.LEFT_JOIN(
+			table.Collections,
+			table.Documents.CollectionID.EQ(table.Collections.ID).
+				AND(table.Collections.UserID.EQ(postgres.Int64(UserID))),
+		),
+	).WHERE(
+		table.Documents.ID.EQ(postgres.Int64(ID)),
+	).LIMIT(1).Sql()
 
-	document := Document{}
+	document := model.Documents{}
 	err := sqldb.
-		QueryRow(ctx, documentQuery, ID, UserID).
-		Scan(&document.ID, &document.Content, &document.CollectionID, &document.UpdatedAt, &document.CreatedAt)
+		QueryRow(ctx, query, args...).
+		Scan(
+			&document.ID,
+			&document.Content,
+			&document.CollectionID,
+			&document.UpdatedAt,
+			&document.CreatedAt,
+		)
 
 	if err != nil {
 		log.WithError(err).Errorf("Could not query document for id %v", ID)
@@ -96,19 +99,25 @@ func GetDocumentByUser(ctx context.Context, ID, UserID uint64) (*Document, error
 	return &document, nil
 }
 
-// Save saves the data of the document it used on. This method only saves
-// the content and collection ID from the struct and updates the timestamps. Save will
+// SaveDocument saves the data of the document it used on. This method only saves
+// the content and collection ID from the struct and updates the timestamps. SaveDocument will
 // trigger an error if the constraints are not respected.
-func (document *Document) Save(ctx context.Context) error {
+func SaveDocument(ctx context.Context, document *model.Documents) error {
 	if document.ID == 0 {
-		documentQuery := `
-		INSERT INTO "documents" (content, collection_id)
-		VALUES ($1, $2)
-		RETURNING id, updated_at, created_at;
-	`
+		query, args := table.Documents.INSERT(
+			table.Documents.Content,
+			table.Documents.CollectionID,
+		).VALUES(
+			document.Content,
+			document.CollectionID,
+		).RETURNING(
+			table.Documents.ID,
+			table.Documents.UpdatedAt,
+			table.Documents.CreatedAt,
+		).Sql()
 
 		err := sqldb.
-			QueryRow(ctx, documentQuery, document.Content, document.CollectionID).
+			QueryRow(ctx, query, args...).
 			Scan(&document.ID, &document.UpdatedAt, &document.CreatedAt)
 
 		if err != nil {
@@ -119,15 +128,18 @@ func (document *Document) Save(ctx context.Context) error {
 		return nil
 	}
 
-	documentQuery := `
-		UPDATE "documents"
-		SET content = $1
-		WHERE id = $2
-		RETURNING id, updated_at, created_at;
-	`
+	query, args := table.Documents.UPDATE().SET(
+		table.Documents.Content.SET(postgres.String(document.Content)),
+	).WHERE(
+		table.Documents.ID.EQ(postgres.Int64(document.ID)),
+	).RETURNING(
+		table.Documents.ID,
+		table.Documents.UpdatedAt,
+		table.Documents.CreatedAt,
+	).Sql()
 
 	err := sqldb.
-		QueryRow(ctx, documentQuery, document.Content, document.ID).
+		QueryRow(ctx, query, args...).
 		Scan(&document.ID, &document.UpdatedAt, &document.CreatedAt)
 
 	if err != nil {
@@ -138,16 +150,16 @@ func (document *Document) Save(ctx context.Context) error {
 	return nil
 }
 
-// Delete deletes the Document is it called on.
-func (document *Document) Delete(ctx context.Context) error {
-	documentQuery := `
-		DELETE FROM "documents"
-		WHERE id = $1
-		RETURNING id;
-	`
+// DeleteDocument deletes the Document is it called on.
+func DeleteDocument(ctx context.Context, document *model.Documents) error {
+	query, args := table.Documents.
+		DELETE().
+		WHERE(table.Documents.ID.EQ(postgres.Int64(document.ID))).
+		RETURNING(table.Documents.ID).
+		Sql()
 
 	deletedID := 0
-	err := sqldb.QueryRow(ctx, documentQuery, document.ID).Scan(&deletedID)
+	err := sqldb.QueryRow(ctx, query, args...).Scan(&deletedID)
 
 	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete document")

@@ -42,14 +42,14 @@ func GenerateSecureApiKey(key string) (string, error) {
 
 // MergeWithKeyID will merge the given API key string with a database integer ID using
 // the API key separator.
-func MergeWithKeyID(key string, keyID uint64) string {
-	keyIDbase64 := base64.URLEncoding.EncodeToString([]byte(strconv.FormatUint(keyID, 10)))
+func MergeWithKeyID(key string, keyID int64) string {
+	keyIDbase64 := base64.URLEncoding.EncodeToString([]byte(strconv.FormatInt(keyID, 10)))
 	return fmt.Sprintf("%s%s%s", keyIDbase64, apiKeySeparator, key)
 }
 
 // ExtractIDAndValue extracts the database ID and API key value from
 // an encoded API key string.
-func ExtractIDAndValue(mergedKey string) (string, uint64, error) {
+func ExtractIDAndValue(mergedKey string) (string, int64, error) {
 	parts := strings.Split(mergedKey, ".")
 	if len(parts) < 2 || len(parts) > 2 {
 		return "", 0, fmt.Errorf("received API key was not a two part key")
@@ -61,7 +61,7 @@ func ExtractIDAndValue(mergedKey string) (string, uint64, error) {
 		return "", 0, err
 	}
 
-	keyID, err := strconv.ParseUint(string(keyIDString), 10, 64)
+	keyID, err := strconv.ParseInt(string(keyIDString), 10, 64)
 	if err != nil {
 		return "", 0, err
 	}

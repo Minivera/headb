@@ -43,7 +43,7 @@ func ListCollections(ctx context.Context) (*ListCollectionsResponse, error) {
 // GetCollectionParams is the parameters for finding a collection by ID
 type GetCollectionParams struct {
 	// The unique identifier of the collection
-	ID uint64
+	ID int64
 }
 
 // GetCollectionResponse is the result of having fetched a collection
@@ -98,7 +98,7 @@ func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*Cre
 	userData := auth.Data().(*identity.UserData)
 
 	collection := models.NewCollection(params.Name, userData.ID)
-	if !collection.ValidateConstraint(ctx) {
+	if !models.ValidateCollectionConstraint(ctx, collection) {
 		log.WithFields(map[string]interface{}{
 			"name":    params.Name,
 			"user_id": userData.ID,
@@ -109,7 +109,7 @@ func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*Cre
 		}
 	}
 
-	err := collection.Save(ctx)
+	err := models.SaveCollection(ctx, collection)
 	if err != nil {
 		log.WithError(err).Error("Could not save collections for this user")
 		return nil, &errs.Error{
@@ -127,7 +127,7 @@ func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*Cre
 // UpdateCollectionParams is the parameters for updating a collection
 type UpdateCollectionParams struct {
 	// The unique identifier for the collection
-	ID uint64
+	ID int64
 
 	// The name of the collection
 	Name string
@@ -163,7 +163,7 @@ func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*Upd
 	}
 
 	collection.Name = params.Name
-	if !collection.ValidateConstraint(ctx) {
+	if !models.ValidateCollectionConstraint(ctx, collection) {
 		log.WithFields(map[string]interface{}{
 			"name":    params.Name,
 			"user_id": userData.ID,
@@ -174,7 +174,7 @@ func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*Upd
 		}
 	}
 
-	err = collection.Save(ctx)
+	err = models.SaveCollection(ctx, collection)
 	if err != nil {
 		log.WithError(err).Error("Could not save collection")
 		return nil, &errs.Error{
@@ -192,7 +192,7 @@ func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*Upd
 // DeleteCollectionParams is the parameters for deleting a collection
 type DeleteCollectionParams struct {
 	// The unique identifier for the collection
-	ID uint64
+	ID int64
 }
 
 // DeleteCollectionResponse is the result of deleting a collection for documents
@@ -224,7 +224,7 @@ func DeleteCollection(ctx context.Context, params *DeleteCollectionParams) (*Del
 		}
 	}
 
-	err = collection.Delete(ctx)
+	err = models.DeleteCollection(ctx, collection)
 	if err != nil {
 		log.WithError(err).Error("Could not delete collection")
 		return nil, &errs.Error{

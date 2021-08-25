@@ -2,26 +2,19 @@ package models
 
 import (
 	"context"
-	"time"
 
 	"encore.dev/storage/sqldb"
+	"github.com/go-jet/jet/v2/postgres"
 	log "github.com/sirupsen/logrus"
-)
 
-// Collection is a struct that mirrors the collection table
-// from the database.
-type Collection struct {
-	ID        uint64
-	Name      string
-	UserID    uint64
-	UpdatedAt time.Time
-	CreatedAt time.Time
-}
+	"encore.app/content/models/generated/content/public/model"
+	"encore.app/content/models/generated/content/public/table"
+)
 
 // NewCollection generates a new collection structure from a name and the
 // associated user ID.
-func NewCollection(name string, userID uint64) *Collection {
-	return &Collection{
+func NewCollection(name string, userID int64) *model.Collections {
+	return &model.Collections{
 		Name:   name,
 		UserID: userID,
 	}
@@ -29,31 +22,34 @@ func NewCollection(name string, userID uint64) *Collection {
 
 // ListCollections lists all collections for a given user, it returns
 // a nil collection on an error.
-func ListCollections(ctx context.Context, UserID uint64) ([]*Collection, error) {
-	collectionQuery := `
-		SELECT
-			id,
-			name,
-			user_id,
-			updated_at,
-			created_at
-		FROM
-			"collections"
-		WHERE
-			collections.user_id = $1;
-	`
+func ListCollections(ctx context.Context, userID int64) ([]*model.Collections, error) {
+	query, args := postgres.SELECT(
+		table.Collections.ID,
+		table.Collections.Name,
+		table.Collections.UserID,
+		table.Collections.UpdatedAt,
+		table.Collections.CreatedAt,
+	).FROM(table.Collections).WHERE(
+		table.Collections.UserID.EQ(postgres.Int64(userID)),
+	).Sql()
 
-	var collections []*Collection
-	rows, err := sqldb.Query(ctx, collectionQuery, UserID)
+	var collections []*model.Collections
+	rows, err := sqldb.Query(ctx, query, args...)
 	if err != nil {
 		log.WithError(err).Error("Could not query collections")
 		return nil, err
 	}
 
 	for rows.Next() {
-		collection := &Collection{}
+		collection := &model.Collections{}
 
-		err = rows.Scan(&collection.ID, &collection.Name, &collection.UserID, &collection.UpdatedAt, &collection.CreatedAt)
+		err = rows.Scan(
+			&collection.ID,
+			&collection.Name,
+			&collection.UserID,
+			&collection.UpdatedAt,
+			&collection.CreatedAt,
+		)
 		if err != nil {
 			log.WithError(err).Error("Could not scan collections")
 			return nil, err
@@ -67,49 +63,53 @@ func ListCollections(ctx context.Context, UserID uint64) ([]*Collection, error) 
 
 // GetCollectionByID fetches a single collection record given an ID and the associated
 // user ID. Returns nil on an error.
-func GetCollectionByID(ctx context.Context, ID, UserID uint64) (*Collection, error) {
-	collectionQuery := `
-		SELECT
-			id,
-			name,
-			user_id,
-			updated_at,
-			created_at
-		FROM
-			"collections"
-		WHERE
-			collections.id = $1 AND collections.user_id = $2
-		LIMIT 1;
-	`
+func GetCollectionByID(ctx context.Context, id, userID int64) (*model.Collections, error) {
+	query, args := postgres.SELECT(
+		table.Collections.ID,
+		table.Collections.Name,
+		table.Collections.UserID,
+		table.Collections.UpdatedAt,
+		table.Collections.CreatedAt,
+	).FROM(
+		table.Collections,
+	).WHERE(
+		table.Collections.ID.EQ(postgres.Int64(id)).
+			AND(table.Collections.UserID.EQ(postgres.Int64(userID))),
+	).LIMIT(1).Sql()
 
-	collection := Collection{}
+	collection := model.Collections{}
 	err := sqldb.
-		QueryRow(ctx, collectionQuery, ID, UserID).
-		Scan(&collection.ID, &collection.Name, &collection.UserID, &collection.UpdatedAt, &collection.CreatedAt)
+		QueryRow(ctx, query, args...).
+		Scan(
+			&collection.ID,
+			&collection.Name,
+			&collection.UserID,
+			&collection.UpdatedAt,
+			&collection.CreatedAt,
+		)
 
 	if err != nil {
-		log.WithError(err).Errorf("Could not query collection for id %d", ID)
+		log.WithError(err).Errorf("Could not query collection for id %d", id)
 		return nil, err
 	}
 
 	return &collection, nil
 }
 
-// ValidateConstraint validates that no collection with the same name exists
+// ValidateCollectionConstraint validates that no collection with the same name exists
 // for a single user.
-func (collection *Collection) ValidateConstraint(ctx context.Context) bool {
-	collectionQuery := `
-		SELECT
-			id
-		FROM
-			"collections"
-		WHERE
-			collections.name = $1 AND collections.user_id = $2
-		LIMIT 1;
-	`
+func ValidateCollectionConstraint(ctx context.Context, collection *model.Collections) bool {
+	query, args := postgres.SELECT(
+		table.Collections.ID,
+	).FROM(
+		table.Collections,
+	).WHERE(
+		table.Collections.Name.EQ(postgres.String(collection.Name)).
+			AND(table.Collections.UserID.EQ(postgres.Int64(collection.UserID))),
+	).LIMIT(1).Sql()
 
 	id := 0
-	err := sqldb.QueryRow(ctx, collectionQuery, collection.Name, collection.UserID).Scan(&id)
+	err := sqldb.QueryRow(ctx, query, args...).Scan(&id)
 	if err == nil && id != 0 {
 		log.Warning("Tried to save collection, a collection already exists for this name and user_id")
 		return false
@@ -118,19 +118,25 @@ func (collection *Collection) ValidateConstraint(ctx context.Context) bool {
 	return true
 }
 
-// Save saves the data of the collection it used on. This method only saves
-// the name and user ID from the struct and updates the timestamps. Save will
+// SaveCollection saves the data of the collection it used on. This method only saves
+// the name and user ID from the struct and updates the timestamps. SaveCollection will
 // trigger an error if the constraints are not respected.
-func (collection *Collection) Save(ctx context.Context) error {
+func SaveCollection(ctx context.Context, collection *model.Collections) error {
 	if collection.ID == 0 {
-		collectionQuery := `
-		INSERT INTO "collections" (name, user_id)
-		VALUES ($1, $2)
-		RETURNING id, updated_at, created_at;
-	`
+		query, args := table.Collections.INSERT(
+			table.Collections.Name,
+			table.Collections.UserID,
+		).VALUES(
+			collection.Name,
+			collection.UserID,
+		).RETURNING(
+			table.Collections.ID,
+			table.Collections.UpdatedAt,
+			table.Collections.CreatedAt,
+		).Sql()
 
 		err := sqldb.
-			QueryRow(ctx, collectionQuery, collection.Name, collection.UserID).
+			QueryRow(ctx, query, args...).
 			Scan(&collection.ID, &collection.UpdatedAt, &collection.CreatedAt)
 
 		if err != nil {
@@ -141,15 +147,19 @@ func (collection *Collection) Save(ctx context.Context) error {
 		return nil
 	}
 
-	collectionQuery := `
-		UPDATE "collections"
-		SET name = $1, user_id = $2
-		WHERE id = $3
-		RETURNING id, updated_at, created_at;
-	`
+	query, args := table.Collections.UPDATE().SET(
+		table.Collections.Name.SET(postgres.String(collection.Name)),
+		table.Collections.UserID.SET(postgres.Int64(collection.UserID)),
+	).WHERE(
+		table.Collections.ID.EQ(postgres.Int64(collection.ID)),
+	).RETURNING(
+		table.Collections.ID,
+		table.Collections.UpdatedAt,
+		table.Collections.CreatedAt,
+	).Sql()
 
 	err := sqldb.
-		QueryRow(ctx, collectionQuery, collection.Name, collection.UserID, collection.ID).
+		QueryRow(ctx, query, args...).
 		Scan(&collection.ID, &collection.UpdatedAt, &collection.CreatedAt)
 
 	if err != nil {
@@ -160,16 +170,16 @@ func (collection *Collection) Save(ctx context.Context) error {
 	return nil
 }
 
-// Delete deletes the Collection is it called on.
-func (collection *Collection) Delete(ctx context.Context) error {
-	collectionQuery := `
-		DELETE FROM "collections"
-		WHERE id = $1
-		RETURNING id;
-	`
+// DeleteCollection deletes the Collection is it called on.
+func DeleteCollection(ctx context.Context, collection *model.Collections) error {
+	query, args := table.Collections.
+		DELETE().
+		WHERE(table.Collections.ID.EQ(postgres.Int64(collection.ID))).
+		RETURNING(table.Collections.ID).
+		Sql()
 
 	deletedID := 0
-	err := sqldb.QueryRow(ctx, collectionQuery, collection.ID).Scan(&deletedID)
+	err := sqldb.QueryRow(ctx, query, args...).Scan(&deletedID)
 
 	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete collection")

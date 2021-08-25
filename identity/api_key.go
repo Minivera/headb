@@ -3,7 +3,6 @@ package identity
 import (
 	"context"
 	"errors"
-	"time"
 
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
@@ -12,6 +11,7 @@ import (
 
 	"encore.app/identity/helpers"
 	"encore.app/identity/models"
+	"encore.app/identity/models/generated/identity/public/model"
 )
 
 // GenerateApiKeyResponse is the result of the generation of an API key
@@ -52,7 +52,7 @@ func GenerateApiKey(ctx context.Context) (*GenerateApiKeyResponse, error) {
 	}, nil
 }
 
-func createKeyForUser(ctx context.Context, user *models.User) (string, *models.ApiKey, error) {
+func createKeyForUser(ctx context.Context, user *model.Users) (string, *model.APIKeys, error) {
 	apiKey, err := helpers.GenerateApiKey()
 	if err != nil {
 		log.WithError(err).Error("Could not generate API key")
@@ -72,7 +72,7 @@ func createKeyForUser(ctx context.Context, user *models.User) (string, *models.A
 	}
 
 	keyRecord := models.NewApiKey(hashedKey, user.ID)
-	err = keyRecord.Save(ctx)
+	err = models.SaveApiKey(ctx, keyRecord)
 	if err != nil {
 		log.WithError(err).Error("Could not save the generated API key")
 		return "", nil, &errs.Error{
@@ -94,10 +94,10 @@ type GetUserForApiKeyInternalParams struct {
 // GetUserForApiKeyInternalResponse is the result of fetching the user using an API key.
 type GetUserForApiKeyInternalResponse struct {
 	// The unique identifier of the key given in the request, for later use.
-	KeyID uint64
+	KeyID int64
 
 	// The fetched user identified for this API key.
-	User *models.User
+	User *model.Users
 }
 
 // GetUserForApiKeyInternal finds the user for a given API key, given that it is valid and the
@@ -152,9 +152,9 @@ func GetUserForApiKeyInternal(ctx context.Context, params *GetUserForApiKeyInter
 		}
 	}
 
-	apiKey.LastUsedAt = time.Now()
+	// Save the key in order to update the last_used_at date
 	// Ignore any potential error, but do log them. We don't care about the date being unsaved
-	err = apiKey.Save(ctx)
+	err = models.SaveApiKey(ctx, apiKey)
 	if err != nil {
 		log.WithError(err).Warning("Could not save the API key")
 	}
@@ -172,10 +172,13 @@ type DeleteApiKeyResponse struct {
 }
 
 // DeleteApiKey will delete the API key used to authenticate this endpoint.
+// TODO: Add some endpoint to list API keys and delete them
 //encore:api auth
 func DeleteApiKey(ctx context.Context) (*DeleteApiKeyResponse, error) {
 	userData := auth.Data().(*UserData)
 
+	// TODO: Delete an API key by ID, not the current API key. That
+	// could lock a user into having no API key to create an API key with.
 	apiKey, err := models.GetApiKey(ctx, userData.KeyID)
 	if errors.Is(err, sqldb.ErrNoRows) {
 		log.WithError(err).Warning("Could not find an API key by the given ID")
@@ -191,7 +194,7 @@ func DeleteApiKey(ctx context.Context) (*DeleteApiKeyResponse, error) {
 		}
 	}
 
-	err = apiKey.Delete(ctx)
+	err = models.DeleteApiKey(ctx, apiKey)
 	if err != nil {
 		log.WithError(err).Error("Could not delete the API key")
 		return nil, &errs.Error{
