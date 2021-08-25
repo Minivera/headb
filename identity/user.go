@@ -8,17 +8,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/identity/github"
-	"encore.app/identity/helpers"
 	"encore.app/identity/models"
 )
-
-var secrets struct {
-	// Client ID for the GitHub OAuth App
-	GithubClientID string
-
-	// Secret key for encryption purposes
-	SecretKey string
-}
 
 // SignInResponse is the response from the sign-in endpoint
 type SignInResponse struct {
@@ -52,7 +43,7 @@ func SignIn(ctx context.Context) (*SignInResponse, error) {
 		}
 	}
 
-	apiKey, keyRecord, err := createKeyForUser(ctx, user)
+	apiKey, _, err := createKeyForUser(ctx, user)
 	if err != nil {
 		log.WithError(err).Error("Could not create an API key for the temporary user")
 		return nil, err
@@ -79,7 +70,7 @@ func SignIn(ctx context.Context) (*SignInResponse, error) {
 			deviceCode.VerificationUri,
 			deviceCode.UserCode,
 		),
-		ApiKey: helpers.MergeWithKeyID(apiKey, keyRecord.ID),
+		ApiKey: apiKey,
 	}, nil
 }
 

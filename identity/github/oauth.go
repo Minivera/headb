@@ -179,7 +179,7 @@ func PollDeviceAuth(clientID, deviceCode string) (AccessTokenResponse, error) {
 // GetUserInfo calls the /user endpoint on the GitHub API to get some basic user information
 // user the given access token.
 func GetUserInfo(ctx context.Context, accessToken string) (github.User, error) {
-	request, err := http.NewRequest("GET", "https://api.github.com/user", nil)
+	request, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user", nil)
 	if err != nil {
 		log.WithError(err).Error("Could not create a request to get the current user")
 		return github.User{}, err
@@ -271,7 +271,15 @@ func HandleDeviceCodePolling(ctx context.Context, user *model.Users,
 		existingUser, _ := models.GetUserByUniqueID(ctx, *userInfo.NodeID)
 		// Make sure to not create duplicates if this is a reauth
 		if existingUser != nil {
-			// TODO: Transfer the API keys of this user to the existing user, otherwise it gets deleted.
+			// Transfer the API keys from the temp user to the existing user so we don't lose the newly created key
+			err := models.TransferApiKeys(ctx, user.ID, existingUser.ID)
+			if err != nil {
+				// If we got an error, we likely could not transfer the keys. This user is now in a bad state.
+				log.WithError(err).WithFields(map[string]interface{}{
+					"corrupted_user_id": existingUser.ID,
+				}).Error("Could not transfer api keys to the exiting account for this user, key will be deleted")
+			}
+
 			dropUser(ctx, user)
 			user = existingUser
 		}

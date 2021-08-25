@@ -3,13 +3,15 @@ package identity
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
 	log "github.com/sirupsen/logrus"
 
-	"encore.app/identity/helpers"
+	"encore.app/identity/keys"
 	"encore.app/identity/models"
 	"encore.app/identity/models/generated/identity/public/model"
 )
@@ -38,22 +40,20 @@ func GenerateApiKey(ctx context.Context) (*GenerateApiKeyResponse, error) {
 		}
 	}
 
-	apiKey, keyRecord, err := createKeyForUser(ctx, user)
+	apiKey, _, err := createKeyForUser(ctx, user)
 	if err != nil {
 		log.WithError(err).Error("Could not create an API key for the user")
 		return nil, err
 	}
 
-	// TODO: Merging the key with the ID is not a great idea, we should try to use a better
-	// method to authenticate users with an API key. Maybe JWTs?
 	return &GenerateApiKeyResponse{
 		Message: "Generated new API key, we will not show this key again. Make sure to save it.",
-		ApiKey:  helpers.MergeWithKeyID(apiKey, keyRecord.ID),
+		ApiKey:  apiKey,
 	}, nil
 }
 
 func createKeyForUser(ctx context.Context, user *model.Users) (string, *model.APIKeys, error) {
-	apiKey, err := helpers.GenerateApiKey()
+	apiKey, err := keys.GenerateApiKey()
 	if err != nil {
 		log.WithError(err).Error("Could not generate API key")
 		return "", nil, &errs.Error{
@@ -62,7 +62,7 @@ func createKeyForUser(ctx context.Context, user *model.Users) (string, *model.AP
 		}
 	}
 
-	hashedKey, err := helpers.GenerateSecureApiKey(apiKey)
+	hashedKey, err := keys.GenerateSecureApiKey(apiKey)
 	if err != nil {
 		log.WithError(err).Error("Could not generate API secure key to save in the database")
 		return "", nil, &errs.Error{
@@ -81,7 +81,68 @@ func createKeyForUser(ctx context.Context, user *model.Users) (string, *model.AP
 		}
 	}
 
-	return apiKey, keyRecord, nil
+	encryptedAPIKey, err := keys.EncryptToPaseto(apiKey, keyRecord.ID, secrets.SecretPasetoKey)
+	if err != nil {
+		log.WithError(err).Error("Could not encrypt the API key using paseto")
+		return "", nil, &errs.Error{
+			Code:    errs.Internal,
+			Message: "Could not process API key",
+		}
+	}
+
+	return encryptedAPIKey, keyRecord, nil
+}
+
+// PublicKey is the representation of an API key that can safely be displayed
+// through an external API request.
+type PublicKey struct {
+	// The unique identifier of the key, can be used to delete it.
+	KeyID int64
+
+	// When this key was last used to authenticate a request.
+	LastUsedDate time.Time
+
+	// When this key was created.
+	CreatedDate time.Time
+}
+
+// ListUserAPIKeysResponse is the result of fetching the all the API keys currently in
+// effect for the authenticated user.
+type ListUserAPIKeysResponse struct {
+	// A message to inform the user of the result of the operation
+	Message string
+
+	// The keys found for the authenticated user.
+	Keys []PublicKey
+}
+
+// ListApiKeys will list all the API keys available for the authenticated user.
+//encore:api auth
+func ListApiKeys(ctx context.Context) (*ListUserAPIKeysResponse, error) {
+	userData := auth.Data().(*UserData)
+
+	apiKeys, err := models.ListApiKeysForUser(ctx, userData.ID)
+	if err != nil {
+		log.WithError(err).Error("Could not fetch API keys for this user")
+		return nil, &errs.Error{
+			Code:    errs.Internal,
+			Message: "Could not find API keys",
+		}
+	}
+
+	publicKeys := make([]PublicKey, len(apiKeys))
+	for i, key := range apiKeys {
+		publicKeys[i] = PublicKey{
+			KeyID:        key.ID,
+			LastUsedDate: key.LastUsedAt,
+			CreatedDate:  key.CreatedAt,
+		}
+	}
+
+	return &ListUserAPIKeysResponse{
+		Message: fmt.Sprintf("Found %d keys on this account.", len(publicKeys)),
+		Keys: publicKeys,
+	}, nil
 }
 
 // GetUserForApiKeyInternalParams is the parameters for fetching an user for authentication between
@@ -104,7 +165,7 @@ type GetUserForApiKeyInternalResponse struct {
 // user can access it.
 //encore:api private
 func GetUserForApiKeyInternal(ctx context.Context, params *GetUserForApiKeyInternalParams) (*GetUserForApiKeyInternalResponse, error) {
-	keyValue, keyID, err := helpers.ExtractIDAndValue(params.KeyString)
+	keyValue, keyID, err := keys.ExtractIDAndValue(params.KeyString, secrets.SecretPasetoKey)
 	if err != nil {
 		log.WithError(err).Warning("Could not parse API key, error when extracting the ID and value")
 		return nil, &errs.Error{
@@ -128,7 +189,7 @@ func GetUserForApiKeyInternal(ctx context.Context, params *GetUserForApiKeyInter
 		}
 	}
 
-	err = helpers.ValidateKey(keyValue, apiKey.Value)
+	err = keys.ValidateKey(keyValue, apiKey.Value)
 	if err != nil {
 		log.WithError(err).Warning("Could not Validate the API key")
 		return nil, &errs.Error{
@@ -165,6 +226,12 @@ func GetUserForApiKeyInternal(ctx context.Context, params *GetUserForApiKeyInter
 	}, nil
 }
 
+// DeleteApiKeyParams is the parameters for requesting the deletion of an API key for a user.
+type DeleteApiKeyParams struct {
+	// THe unique identifier of the key to delete
+	APIKeyID int64
+}
+
 // DeleteApiKeyResponse is the result of the deletion of an API key
 type DeleteApiKeyResponse struct {
 	// A message to inform the user of the result of the operation
@@ -172,19 +239,16 @@ type DeleteApiKeyResponse struct {
 }
 
 // DeleteApiKey will delete the API key used to authenticate this endpoint.
-// TODO: Add some endpoint to list API keys and delete them
 //encore:api auth
-func DeleteApiKey(ctx context.Context) (*DeleteApiKeyResponse, error) {
+func DeleteApiKey(ctx context.Context, params *DeleteApiKeyParams) (*DeleteApiKeyResponse, error) {
 	userData := auth.Data().(*UserData)
 
-	// TODO: Delete an API key by ID, not the current API key. That
-	// could lock a user into having no API key to create an API key with.
-	apiKey, err := models.GetApiKey(ctx, userData.KeyID)
+	apiKey, err := models.GetApiKeyForUser(ctx, params.APIKeyID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
 		log.WithError(err).Warning("Could not find an API key by the given ID")
 		return nil, &errs.Error{
 			Code:    errs.NotFound,
-			Message: "Could not find API key used to authenticate the request",
+			Message: "Could not find API key",
 		}
 	} else if err != nil {
 		log.WithError(err).Error("Could not find API key")
