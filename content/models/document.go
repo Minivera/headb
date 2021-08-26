@@ -73,11 +73,11 @@ func GetDocumentByUser(ctx context.Context, ID, UserID int64) (*model.Documents,
 	).FROM(
 		table.Documents.LEFT_JOIN(
 			table.Collections,
-			table.Documents.CollectionID.EQ(table.Collections.ID).
-				AND(table.Collections.UserID.EQ(postgres.Int64(UserID))),
+			table.Documents.CollectionID.EQ(table.Collections.ID),
 		),
 	).WHERE(
-		table.Documents.ID.EQ(postgres.Int64(ID)),
+		table.Documents.ID.EQ(postgres.Int64(ID)).
+			AND(table.Collections.UserID.EQ(postgres.Int64(UserID))),
 	).LIMIT(1).Sql()
 
 	document := model.Documents{}
