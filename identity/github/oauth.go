@@ -9,12 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"encore.app/identity/models/generated/identity/public/model"
-
 	"github.com/google/go-github/github"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/identity/models"
+	"encore.app/identity/models/generated/identity/public/model"
 )
 
 var (
@@ -54,6 +53,36 @@ var (
 	ErrAccessDenied = errors.New("access was denied to the resource")
 )
 
+// OAuthClient is a client implementation for triggering the device code
+// OAuth flow with GitHub and getting the user info.
+type OAuthClient struct {
+	clientID string
+
+	deviceCodeURL  string
+	accessTokenURL string
+	identityURL    string
+}
+
+// NewOAuthClientOptions are the available options to add to the OAuth client
+// when creating it.
+type NewOAuthClientOptions struct {
+	ClientID       string
+	DeviceCodeURL  string
+	AccessTokenURL string
+	IdentityURL    string
+}
+
+// NewOAuthClient will create a new client based on the options and return
+// an instance of the client.
+func NewOAuthClient(options NewOAuthClientOptions) OAuthClient {
+	return OAuthClient{
+		clientID:       options.ClientID,
+		deviceCodeURL:  options.DeviceCodeURL,
+		accessTokenURL: options.AccessTokenURL,
+		identityURL:    options.IdentityURL,
+	}
+}
+
 // DeviceCodeResponse is the response given to a POST request to the
 // github device code endpoint for device OAuth.
 type DeviceCodeResponse struct {
@@ -80,10 +109,10 @@ type AccessTokenResponse struct {
 
 // RequestDeviceCode will send a request to GitHub for a new device code so the
 // user can start authenticating.
-func RequestDeviceCode(clientID string) (DeviceCodeResponse, error) {
-	payload := strings.NewReader(fmt.Sprintf("client_id=%s", clientID))
+func (c OAuthClient) RequestDeviceCode() (DeviceCodeResponse, error) {
+	payload := strings.NewReader(fmt.Sprintf("client_id=%s", c.clientID))
 
-	request, err := http.NewRequest("POST", "https://github.com/login/device/code", payload)
+	request, err := http.NewRequest("POST", c.deviceCodeURL, payload)
 	if err != nil {
 		log.WithError(err).Error("Could not create a request to get a device code")
 		return DeviceCodeResponse{}, err
@@ -112,16 +141,16 @@ func RequestDeviceCode(clientID string) (DeviceCodeResponse, error) {
 }
 
 // PollDeviceAuth tries to get the access token for a device code on an OAuth provider.
-func PollDeviceAuth(clientID, deviceCode string) (AccessTokenResponse, error) {
+func (c OAuthClient) PollDeviceAuth(deviceCode string) (AccessTokenResponse, error) {
 	payload := strings.NewReader(
 		fmt.Sprintf(
 			"client_id=%s&device_code=%s&grant_type=urn:ietf:params:oauth:grant-type:device_code",
-			clientID,
+			c.clientID,
 			deviceCode,
 		),
 	)
 
-	request, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", payload)
+	request, err := http.NewRequest("POST", c.accessTokenURL, payload)
 	if err != nil {
 		log.WithError(err).Error("Could not create a request to get an access token")
 		return AccessTokenResponse{}, err
@@ -178,8 +207,8 @@ func PollDeviceAuth(clientID, deviceCode string) (AccessTokenResponse, error) {
 
 // GetUserInfo calls the /user endpoint on the GitHub API to get some basic user information
 // user the given access token.
-func GetUserInfo(ctx context.Context, accessToken string) (github.User, error) {
-	request, err := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user", nil)
+func (c OAuthClient) GetUserInfo(ctx context.Context, accessToken string) (github.User, error) {
+	request, err := http.NewRequestWithContext(ctx, "GET", c.identityURL, nil)
 	if err != nil {
 		log.WithError(err).Error("Could not create a request to get the current user")
 		return github.User{}, err
@@ -210,14 +239,14 @@ func GetUserInfo(ctx context.Context, accessToken string) (github.User, error) {
 
 // HandleDeviceCodePolling handles the flow of polling the OAuth provider for an OAuth
 // access token.
-func HandleDeviceCodePolling(ctx context.Context, user *model.Users,
-	deviceCode DeviceCodeResponse, clientID, secretKey string) {
+func (c OAuthClient) HandleDeviceCodePolling(ctx context.Context, user *model.Users,
+	deviceCode DeviceCodeResponse, secretKey string) {
 
 	currentTime := time.Now()
 
 	// As long as the code is not expired
 	for currentTime.Before(currentTime.Add(time.Duration(deviceCode.ExpiresIn) * time.Second)) {
-		pollingResp, err := PollDeviceAuth(clientID, deviceCode.DeviceCode)
+		pollingResp, err := c.PollDeviceAuth(deviceCode.DeviceCode)
 		if err != nil {
 			// If we got an error, process it as intended
 			switch {
@@ -254,7 +283,7 @@ func HandleDeviceCodePolling(ctx context.Context, user *model.Users,
 			}
 		}
 
-		userInfo, err := GetUserInfo(ctx, pollingResp.AccessToken)
+		userInfo, err := c.GetUserInfo(ctx, pollingResp.AccessToken)
 		if err != nil {
 			log.WithError(err).Error("Could not make a request for user info to Github.")
 			dropUser(ctx, user)

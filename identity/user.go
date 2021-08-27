@@ -11,6 +11,12 @@ import (
 	"encore.app/identity/models"
 )
 
+var (
+	githubOAuthDeviceCodeURL  = "https://github.com/login/device/code"
+	githubOAuthAccessTokenURL = "https://github.com/login/oauth/access_token"
+	githubOAuthIdentityURL    = "https://api.github.com/user"
+)
+
 // SignInResponse is the response from the sign-in endpoint
 type SignInResponse struct {
 	// A message to inform the user of the result of the operation
@@ -23,7 +29,14 @@ type SignInResponse struct {
 // SignIn creates a user account for the given username.
 //encore:api public
 func SignIn(ctx context.Context) (*SignInResponse, error) {
-	deviceCode, err := github.RequestDeviceCode(secrets.GithubClientID)
+	client := github.NewOAuthClient(github.NewOAuthClientOptions{
+		ClientID:       secrets.GithubClientID,
+		DeviceCodeURL:  githubOAuthDeviceCodeURL,
+		AccessTokenURL: githubOAuthAccessTokenURL,
+		IdentityURL:    githubOAuthIdentityURL,
+	})
+
+	deviceCode, err := client.RequestDeviceCode()
 	if err != nil {
 		log.WithError(err).Error("Could not request a device code")
 		return nil, &errs.Error{
@@ -52,11 +65,10 @@ func SignIn(ctx context.Context) (*SignInResponse, error) {
 	// FIXME: This won't work long term since the oauth process will
 	// die if the server dies. Should probably make this into a queue of some
 	// kind.
-	go github.HandleDeviceCodePolling(
+	go client.HandleDeviceCodePolling(
 		context.Background(),
 		user,
 		deviceCode,
-		secrets.GithubClientID,
 		secrets.SecretKey,
 	)
 

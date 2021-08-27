@@ -107,11 +107,17 @@ func SaveUser(ctx context.Context, user *model.Users) error {
 		return nil
 	}
 
-	query, args := table.Users.UPDATE().SET(
-		table.Users.Username.SET(postgres.String(*user.Username)),
-		table.Users.Token.SET(postgres.String(*user.Token)),
-		table.Users.UniqueID.SET(postgres.String(*user.UniqueID)),
-		table.Users.Status.SET(postgres.String(user.Status.String())),
+	// Use the non type safe version to allow for nulls
+	query, args := table.Users.UPDATE(
+		table.Users.Username,
+		table.Users.Token,
+		table.Users.UniqueID,
+		table.Users.Status,
+	).SET(
+		user.Username,
+		user.Token,
+		user.UniqueID,
+		user.Status,
 	).WHERE(
 		table.Users.ID.EQ(postgres.Int64(user.ID)),
 	).RETURNING(

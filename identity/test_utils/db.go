@@ -9,7 +9,7 @@ import (
 
 func Cleanup(ctx context.Context) error {
 	query := `
-		TRUNCATE documents, collections;
+		TRUNCATE api_keys, users;
 	`
 
 	_, err := sqldb.Exec(ctx, query)
