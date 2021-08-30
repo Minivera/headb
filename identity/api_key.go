@@ -31,6 +31,10 @@ type GenerateApiKeyResponse struct {
 func GenerateApiKey(ctx context.Context) (*GenerateApiKeyResponse, error) {
 	userData := auth.Data().(*UserData)
 
+	return generateApiKey(ctx, userData)
+}
+
+func generateApiKey(ctx context.Context, userData *UserData) (*GenerateApiKeyResponse, error) {
 	user, err := models.GetUserByID(ctx, userData.ID)
 	if err != nil {
 		log.WithError(err).Error("Could not fetch user from the auth ID")
@@ -121,6 +125,10 @@ type ListUserAPIKeysResponse struct {
 func ListApiKeys(ctx context.Context) (*ListUserAPIKeysResponse, error) {
 	userData := auth.Data().(*UserData)
 
+	return listApiKeys(ctx, userData)
+}
+
+func listApiKeys(ctx context.Context, userData *UserData) (*ListUserAPIKeysResponse, error) {
 	apiKeys, err := models.ListApiKeysForUser(ctx, userData.ID)
 	if err != nil {
 		log.WithError(err).Error("Could not fetch API keys for this user")
@@ -141,7 +149,7 @@ func ListApiKeys(ctx context.Context) (*ListUserAPIKeysResponse, error) {
 
 	return &ListUserAPIKeysResponse{
 		Message: fmt.Sprintf("Found %d keys on this account.", len(publicKeys)),
-		Keys: publicKeys,
+		Keys:    publicKeys,
 	}, nil
 }
 
@@ -243,6 +251,10 @@ type DeleteApiKeyResponse struct {
 func DeleteApiKey(ctx context.Context, params *DeleteApiKeyParams) (*DeleteApiKeyResponse, error) {
 	userData := auth.Data().(*UserData)
 
+	return deleteApiKey(ctx, params, userData)
+}
+
+func deleteApiKey(ctx context.Context, params *DeleteApiKeyParams, userData *UserData) (*DeleteApiKeyResponse, error) {
 	apiKey, err := models.GetApiKeyForUser(ctx, params.APIKeyID, userData.ID)
 	if errors.Is(err, sqldb.ErrNoRows) {
 		log.WithError(err).Warning("Could not find an API key by the given ID")

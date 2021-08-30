@@ -6,17 +6,15 @@ import (
 	"time"
 
 	"encore.dev/beta/errs"
-
-	"encore.app/identity/models/generated/identity/public/table"
 	"encore.dev/storage/sqldb"
 	"github.com/go-jet/jet/v2/postgres"
-	"github.com/stretchr/testify/require"
-
 	gogithub "github.com/google/go-github/github"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"encore.app/identity/github"
 	"encore.app/identity/models/generated/identity/public/model"
+	"encore.app/identity/models/generated/identity/public/table"
 	"encore.app/identity/test_utils"
 )
 
@@ -139,8 +137,8 @@ func TestSignIn(t *testing.T) {
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)
-				assert.NotEqual(t, "", response.Message)
-				assert.NotEqual(t, "", response.ApiKey)
+				assert.NotEmpty(t, response.Message)
+				assert.NotEmpty(t, response.ApiKey)
 			}
 
 			if tc.expected.user != nil {
