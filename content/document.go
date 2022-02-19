@@ -3,11 +3,10 @@ package content
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
+	"encore.app/content/helpers"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
-	"encore.dev/storage/sqldb"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/content/convert"
@@ -32,23 +31,9 @@ type ListDocumentsResponse struct {
 func ListDocuments(ctx context.Context, params *ListDocumentsParams) (*ListDocumentsResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	return listDocuments(ctx, params, userData)
-}
-
-func listDocuments(ctx context.Context, params *ListDocumentsParams, userData *identity.UserData) (*ListDocumentsResponse, error) {
-	collection, err := models.GetCollectionByID(ctx, params.CollectionID, userData.ID)
-	if errors.Is(err, sqldb.ErrNoRows) {
-		log.WithError(err).Warning("Could not find collection by ID for document")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find collection",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not find collection for document")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find collection, unknown error",
-		}
+	collection, err := helpers.GetCollection(ctx, params.CollectionID, userData.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	documents, err := models.ListDocuments(ctx, collection.ID)
@@ -91,23 +76,9 @@ type GetDocumentResponse struct {
 func GetDocument(ctx context.Context, params *GetDocumentParams) (*GetDocumentResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	return getDocument(ctx, params, userData)
-}
-
-func getDocument(ctx context.Context, params *GetDocumentParams, userData *identity.UserData) (*GetDocumentResponse, error) {
-	document, err := models.GetDocumentByUser(ctx, params.ID, userData.ID)
-	if errors.Is(err, sqldb.ErrNoRows) {
-		log.WithError(err).Warning("Could not find document by ID")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find document",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not find document")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find document, unknown error",
-		}
+	document, err := helpers.GetDocument(ctx, params.ID, userData.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	payload, err := convert.DocumentModelToPayload(document)
@@ -147,28 +118,13 @@ type CreateDocumentResponse struct {
 func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateDocumentResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	return createDocument(ctx, params, userData)
-}
-
-func createDocument(ctx context.Context, params *CreateDocumentParams, userData *identity.UserData) (*CreateDocumentResponse, error) {
-	collection, err := models.GetCollectionByID(ctx, params.CollectionID, userData.ID)
-	if errors.Is(err, sqldb.ErrNoRows) {
-		log.WithError(err).Warning("Could not find collection by ID for document")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find collection",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not find collection for document")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find collection, unknown error",
-		}
+	collection, err := helpers.GetCollection(ctx, params.CollectionID, userData.ID)
+	if err != nil {
+		return nil, err
 	}
 
-	var content map[string]interface{}
-	err = json.Unmarshal(params.Content, &content)
-	if err != nil {
+	_, err = params.Content.MarshalJSON()
+	if string(params.Content) == "null" || err != nil {
 		log.WithError(err).Warning("Could not validate JSON on document request")
 		return nil, &errs.Error{
 			Code:    errs.InvalidArgument,
@@ -225,28 +181,13 @@ type UpdateDocumentResponse struct {
 func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateDocumentResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	return updateDocument(ctx, params, userData)
-}
-
-func updateDocument(ctx context.Context, params *UpdateDocumentParams, userData *identity.UserData) (*UpdateDocumentResponse, error) {
-	document, err := models.GetDocumentByUser(ctx, params.ID, userData.ID)
-	if errors.Is(err, sqldb.ErrNoRows) {
-		log.WithError(err).Warning("Could not find document by ID")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find document",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not find document")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find document, unknown error",
-		}
+	document, err := helpers.GetDocument(ctx, params.ID, userData.ID)
+	if err != nil {
+		return nil, err
 	}
 
-	var content map[string]interface{}
-	err = json.Unmarshal(params.Content, &content)
-	if err != nil {
+	_, err = params.Content.MarshalJSON()
+	if string(params.Content) == "null" || err != nil {
 		log.WithError(err).Warning("Could not validate JSON on document request")
 		return nil, &errs.Error{
 			Code:    errs.InvalidArgument,
@@ -300,23 +241,9 @@ type DeleteDocumentResponse struct {
 func DeleteDocument(ctx context.Context, params *DeleteDocumentParams) (*DeleteDocumentResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	return deleteDocument(ctx, params, userData)
-}
-
-func deleteDocument(ctx context.Context, params *DeleteDocumentParams, userData *identity.UserData) (*DeleteDocumentResponse, error) {
-	document, err := models.GetDocumentByUser(ctx, params.ID, userData.ID)
-	if errors.Is(err, sqldb.ErrNoRows) {
-		log.WithError(err).Warning("Could not fetch document by ID")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find document",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not fetch document")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find document, unknown error",
-		}
+	document, err := helpers.GetDocument(ctx, params.ID, userData.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	err = models.DeleteDocument(ctx, document)

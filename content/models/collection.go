@@ -11,6 +11,8 @@ import (
 	"encore.app/content/models/generated/content/public/table"
 )
 
+var db = sqldb.Named("content").Stdlib()
+
 // NewCollection generates a new collection structure from a name and the
 // associated user ID.
 func NewCollection(name string, userID int64) *model.Collections {
@@ -23,7 +25,7 @@ func NewCollection(name string, userID int64) *model.Collections {
 // ListCollections lists all collections for a given user, it returns
 // a nil collection on an error.
 func ListCollections(ctx context.Context, userID int64) ([]*model.Collections, error) {
-	query, args := postgres.SELECT(
+	statement := postgres.SELECT(
 		table.Collections.ID,
 		table.Collections.Name,
 		table.Collections.UserID,
@@ -31,31 +33,13 @@ func ListCollections(ctx context.Context, userID int64) ([]*model.Collections, e
 		table.Collections.CreatedAt,
 	).FROM(table.Collections).WHERE(
 		table.Collections.UserID.EQ(postgres.Int64(userID)),
-	).Sql()
+	)
 
 	var collections []*model.Collections
-	rows, err := sqldb.Query(ctx, query, args...)
+	err := statement.QueryContext(ctx, db, &collections)
 	if err != nil {
 		log.WithError(err).Error("Could not query collections")
 		return nil, err
-	}
-
-	for rows.Next() {
-		collection := &model.Collections{}
-
-		err = rows.Scan(
-			&collection.ID,
-			&collection.Name,
-			&collection.UserID,
-			&collection.UpdatedAt,
-			&collection.CreatedAt,
-		)
-		if err != nil {
-			log.WithError(err).Error("Could not scan collections")
-			return nil, err
-		}
-
-		collections = append(collections, collection)
 	}
 
 	return collections, nil
@@ -64,7 +48,7 @@ func ListCollections(ctx context.Context, userID int64) ([]*model.Collections, e
 // GetCollectionByID fetches a single collection record given an ID and the associated
 // user ID. Returns nil on an error.
 func GetCollectionByID(ctx context.Context, id, userID int64) (*model.Collections, error) {
-	query, args := postgres.SELECT(
+	statement := postgres.SELECT(
 		table.Collections.ID,
 		table.Collections.Name,
 		table.Collections.UserID,
@@ -75,19 +59,10 @@ func GetCollectionByID(ctx context.Context, id, userID int64) (*model.Collection
 	).WHERE(
 		table.Collections.ID.EQ(postgres.Int64(id)).
 			AND(table.Collections.UserID.EQ(postgres.Int64(userID))),
-	).LIMIT(1).Sql()
+	).LIMIT(1)
 
 	collection := model.Collections{}
-	err := sqldb.
-		QueryRow(ctx, query, args...).
-		Scan(
-			&collection.ID,
-			&collection.Name,
-			&collection.UserID,
-			&collection.UpdatedAt,
-			&collection.CreatedAt,
-		)
-
+	err := statement.QueryContext(ctx, db, &collection)
 	if err != nil {
 		log.WithError(err).Errorf("Could not query collection for id %d", id)
 		return nil, err
@@ -180,7 +155,6 @@ func DeleteCollection(ctx context.Context, collection *model.Collections) error 
 
 	deletedID := 0
 	err := sqldb.QueryRow(ctx, query, args...).Scan(&deletedID)
-
 	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete collection")
 		return err

@@ -2,12 +2,11 @@ package content
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	"encore.app/content/helpers"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
-	"encore.dev/storage/sqldb"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/content/convert"
@@ -26,10 +25,6 @@ type ListCollectionsResponse struct {
 func ListCollections(ctx context.Context) (*ListCollectionsResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	return listCollections(ctx, userData)
-}
-
-func listCollections(ctx context.Context, userData *identity.UserData) (*ListCollectionsResponse, error) {
 	collections, err := models.ListCollections(ctx, userData.ID)
 	if err != nil {
 		log.WithError(err).Warning("Could not fetch collections for this user")
@@ -61,23 +56,9 @@ type GetCollectionResponse struct {
 func GetCollection(ctx context.Context, params *GetCollectionParams) (*GetCollectionResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	return getCollection(ctx, params, userData)
-}
-
-func getCollection(ctx context.Context, params *GetCollectionParams, userData *identity.UserData) (*GetCollectionResponse, error) {
-	collection, err := models.GetCollectionByID(ctx, params.ID, userData.ID)
-	if errors.Is(err, sqldb.ErrNoRows) {
-		log.WithError(err).Warning("Could not collection by ID")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find collection",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not fetch collection")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find collection, unknown error",
-		}
+	collection, err := helpers.GetCollection(ctx, params.ID, userData.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	return &GetCollectionResponse{
@@ -105,10 +86,6 @@ type CreateCollectionResponse struct {
 func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*CreateCollectionResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	return createCollection(ctx, params, userData)
-}
-
-func createCollection(ctx context.Context, params *CreateCollectionParams, userData *identity.UserData) (*CreateCollectionResponse, error) {
 	collection := models.NewCollection(params.Name, userData.ID)
 	if !models.ValidateCollectionConstraint(ctx, collection) {
 		log.WithFields(map[string]interface{}{
@@ -159,23 +136,9 @@ type UpdateCollectionResponse struct {
 func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*UpdateCollectionResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	return updateCollection(ctx, params, userData)
-}
-
-func updateCollection(ctx context.Context, params *UpdateCollectionParams, userData *identity.UserData) (*UpdateCollectionResponse, error) {
-	collection, err := models.GetCollectionByID(ctx, params.ID, userData.ID)
-	if errors.Is(err, sqldb.ErrNoRows) {
-		log.WithError(err).Warning("Could not fetch collection by ID")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find collection",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not fetch collection")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find collection, unknown error",
-		}
+	collection, err := helpers.GetCollection(ctx, params.ID, userData.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	collection.Name = params.Name
@@ -225,23 +188,9 @@ type DeleteCollectionResponse struct {
 func DeleteCollection(ctx context.Context, params *DeleteCollectionParams) (*DeleteCollectionResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	return deleteCollection(ctx, params, userData)
-}
-
-func deleteCollection(ctx context.Context, params *DeleteCollectionParams, userData *identity.UserData) (*DeleteCollectionResponse, error) {
-	collection, err := models.GetCollectionByID(ctx, params.ID, userData.ID)
-	if errors.Is(err, sqldb.ErrNoRows) {
-		log.WithError(err).Warning("Could not fetch collection by ID")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find collection",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not fetch collection")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find collection, unknown error",
-		}
+	collection, err := helpers.GetCollection(ctx, params.ID, userData.ID)
+	if err != nil {
+		return nil, err
 	}
 
 	err = models.DeleteCollection(ctx, collection)

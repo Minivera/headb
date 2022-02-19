@@ -2,9 +2,12 @@ package content
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
+	test_utils2 "encore.app/test_utils"
+	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
 	"github.com/stretchr/testify/assert"
@@ -114,15 +117,15 @@ func TestListCollections(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
 			err := insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
 
-			response, err := listCollections(ctx, tc.userData)
+			response, err := ListCollections(ctx)
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)
@@ -196,15 +199,15 @@ func TestGetCollection(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
 			err := insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
 
-			response, err := getCollection(ctx, tc.params, tc.userData)
+			response, err := GetCollection(ctx, tc.params)
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)
@@ -270,15 +273,15 @@ func TestCreateCollection(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
 			err := insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
 
-			response, err := createCollection(ctx, tc.params, tc.userData)
+			response, err := CreateCollection(ctx, tc.params)
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)
@@ -362,15 +365,15 @@ func TestUpdateCollection(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
 			err := insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
 
-			response, err := updateCollection(ctx, tc.params, tc.userData)
+			response, err := UpdateCollection(ctx, tc.params)
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)
@@ -437,15 +440,15 @@ func TestDeleteCollection(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
 			err := insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
 
-			response, err := deleteCollection(ctx, tc.params, tc.userData)
+			response, err := DeleteCollection(ctx, tc.params)
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)

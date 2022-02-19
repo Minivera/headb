@@ -23,7 +23,7 @@ func NewDocument(content string, collectionID int64) *model.Documents {
 // ListDocuments lists all documents for a given collection, returning an empty slice
 // on an error.
 func ListDocuments(ctx context.Context, CollectionID int64) ([]*model.Documents, error) {
-	query, args := postgres.SELECT(
+	statement := postgres.SELECT(
 		table.Documents.ID,
 		table.Documents.Content,
 		table.Documents.CollectionID,
@@ -31,31 +31,13 @@ func ListDocuments(ctx context.Context, CollectionID int64) ([]*model.Documents,
 		table.Documents.CreatedAt,
 	).FROM(table.Documents).WHERE(
 		table.Documents.CollectionID.EQ(postgres.Int64(CollectionID)),
-	).Sql()
+	)
 
 	var documents []*model.Documents
-	rows, err := sqldb.Query(ctx, query, args...)
+	err := statement.QueryContext(ctx, db, &documents)
 	if err != nil {
 		log.WithError(err).Error("Could not query documents")
 		return nil, err
-	}
-
-	for rows.Next() {
-		document := &model.Documents{}
-
-		err = rows.Scan(
-			&document.ID,
-			&document.Content,
-			&document.CollectionID,
-			&document.UpdatedAt,
-			&document.CreatedAt,
-		)
-		if err != nil {
-			log.WithError(err).Error("Could not scan documents")
-			return nil, err
-		}
-
-		documents = append(documents, document)
 	}
 
 	return documents, nil
@@ -64,7 +46,7 @@ func ListDocuments(ctx context.Context, CollectionID int64) ([]*model.Documents,
 // GetDocumentByUser fetches a single document record given an ID and the associated
 // user ID of the collection this document belongs to. Returns nil on an error.
 func GetDocumentByUser(ctx context.Context, ID, UserID int64) (*model.Documents, error) {
-	query, args := postgres.SELECT(
+	statement := postgres.SELECT(
 		table.Documents.ID,
 		table.Documents.Content,
 		table.Documents.CollectionID,
@@ -78,19 +60,10 @@ func GetDocumentByUser(ctx context.Context, ID, UserID int64) (*model.Documents,
 	).WHERE(
 		table.Documents.ID.EQ(postgres.Int64(ID)).
 			AND(table.Collections.UserID.EQ(postgres.Int64(UserID))),
-	).LIMIT(1).Sql()
+	).LIMIT(1)
 
 	document := model.Documents{}
-	err := sqldb.
-		QueryRow(ctx, query, args...).
-		Scan(
-			&document.ID,
-			&document.Content,
-			&document.CollectionID,
-			&document.UpdatedAt,
-			&document.CreatedAt,
-		)
-
+	err := statement.QueryContext(ctx, db, &document)
 	if err != nil {
 		log.WithError(err).Errorf("Could not query document for id %v", ID)
 		return nil, err
@@ -160,7 +133,6 @@ func DeleteDocument(ctx context.Context, document *model.Documents) error {
 
 	deletedID := 0
 	err := sqldb.QueryRow(ctx, query, args...).Scan(&deletedID)
-
 	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete document")
 		return err

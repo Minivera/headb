@@ -11,6 +11,7 @@ import (
 	"encore.dev/storage/sqldb"
 	log "github.com/sirupsen/logrus"
 
+	"encore.app/identity/helpers"
 	"encore.app/identity/keys"
 	"encore.app/identity/models"
 	"encore.app/identity/models/generated/identity/public/model"
@@ -31,10 +32,6 @@ type GenerateApiKeyResponse struct {
 func GenerateApiKey(ctx context.Context) (*GenerateApiKeyResponse, error) {
 	userData := auth.Data().(*UserData)
 
-	return generateApiKey(ctx, userData)
-}
-
-func generateApiKey(ctx context.Context, userData *UserData) (*GenerateApiKeyResponse, error) {
 	user, err := models.GetUserByID(ctx, userData.ID)
 	if err != nil {
 		log.WithError(err).Error("Could not fetch user from the auth ID")
@@ -125,10 +122,6 @@ type ListUserAPIKeysResponse struct {
 func ListApiKeys(ctx context.Context) (*ListUserAPIKeysResponse, error) {
 	userData := auth.Data().(*UserData)
 
-	return listApiKeys(ctx, userData)
-}
-
-func listApiKeys(ctx context.Context, userData *UserData) (*ListUserAPIKeysResponse, error) {
 	apiKeys, err := models.ListApiKeysForUser(ctx, userData.ID)
 	if err != nil {
 		log.WithError(err).Error("Could not fetch API keys for this user")
@@ -190,7 +183,7 @@ func GetUserForApiKeyInternal(ctx context.Context, params *GetUserForApiKeyInter
 			Message: "Could not find API key",
 		}
 	} else if err != nil {
-		log.WithError(err).Error("Could not find APi key")
+		log.WithError(err).Error("Could not find API key")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not find API key",
@@ -206,19 +199,9 @@ func GetUserForApiKeyInternal(ctx context.Context, params *GetUserForApiKeyInter
 		}
 	}
 
-	user, err := models.GetUserByID(ctx, apiKey.UserID)
-	if errors.Is(err, sqldb.ErrNoRows) {
-		log.WithError(err).Warning("Could not find user by the given ID")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find user for API key",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not find user")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find user for API key",
-		}
+	user, err := helpers.GetUser(ctx, apiKey.UserID)
+	if err != nil {
+		return nil, err
 	}
 
 	// Save the key in order to update the last_used_at date
@@ -251,23 +234,10 @@ type DeleteApiKeyResponse struct {
 func DeleteApiKey(ctx context.Context, params *DeleteApiKeyParams) (*DeleteApiKeyResponse, error) {
 	userData := auth.Data().(*UserData)
 
-	return deleteApiKey(ctx, params, userData)
-}
-
-func deleteApiKey(ctx context.Context, params *DeleteApiKeyParams, userData *UserData) (*DeleteApiKeyResponse, error) {
-	apiKey, err := models.GetApiKeyForUser(ctx, params.APIKeyID, userData.ID)
-	if errors.Is(err, sqldb.ErrNoRows) {
-		log.WithError(err).Warning("Could not find an API key by the given ID")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find API key",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not find API key")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find API key, unknown error",
-		}
+	apiKey, err := helpers.GetApiKey(ctx, params.APIKeyID, userData.ID)
+	if err != nil {
+		log.WithError(err).Error("Could not find API key to delete")
+		return nil, err
 	}
 
 	err = models.DeleteApiKey(ctx, apiKey)

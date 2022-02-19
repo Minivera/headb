@@ -3,11 +3,16 @@ package content
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
+	test_utils2 "encore.app/test_utils"
+	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -161,7 +166,7 @@ func TestListDocuments(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
 			err = insertCollections(ctx, validCollections)
@@ -170,9 +175,9 @@ func TestListDocuments(t *testing.T) {
 			err := insertDocuments(ctx, tc.existingDocuments)
 			require.NoError(t, err)
 
-			response, err := listDocuments(ctx, tc.params, tc.userData)
+			response, err := ListDocuments(ctx, tc.params)
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)
@@ -255,7 +260,7 @@ func TestGetDocument(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
 			err = insertCollections(ctx, []*model.Collections{validCollection})
@@ -264,9 +269,9 @@ func TestGetDocument(t *testing.T) {
 			err := insertDocuments(ctx, tc.existingDocuments)
 			require.NoError(t, err)
 
-			response, err := getDocument(ctx, tc.params, tc.userData)
+			response, err := GetDocument(ctx, tc.params)
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)
@@ -346,17 +351,19 @@ func TestCreateDocument(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
 			err := insertCollections(ctx, []*model.Collections{validCollection})
 			require.NoError(t, err)
 
-			response, err := createDocument(ctx, tc.params, tc.userData)
+			response, err := CreateDocument(ctx, tc.params)
+			fmt.Printf("%s: %v", tc.scenario, string(tc.params.Content))
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
+				log.Warningf("maybe nil %s: %v", tc.scenario, err)
 				assert.NoError(t, err)
 				assert.Equal(t, string(tc.expected.response.Document.Content), string(response.Document.Content))
 			}
@@ -446,7 +453,7 @@ func TestUpdateDocument(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
 			err := insertCollections(ctx, []*model.Collections{validCollection})
@@ -455,9 +462,9 @@ func TestUpdateDocument(t *testing.T) {
 			err = insertDocuments(ctx, tc.existingDocuments)
 			require.NoError(t, err)
 
-			response, err := updateDocument(ctx, tc.params, tc.userData)
+			response, err := UpdateDocument(ctx, tc.params)
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)
@@ -532,7 +539,7 @@ func TestDeleteDocument(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
 			err := insertCollections(ctx, []*model.Collections{validCollection})
@@ -541,9 +548,9 @@ func TestDeleteDocument(t *testing.T) {
 			err = insertDocuments(ctx, tc.existingDocuments)
 			require.NoError(t, err)
 
-			response, err := deleteDocument(ctx, tc.params, tc.userData)
+			response, err := DeleteDocument(ctx, tc.params)
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)

@@ -33,7 +33,7 @@ func GetUserByUniqueID(ctx context.Context, uniqueID string) (*model.Users, erro
 // GetUserBy is a utility function that fetches a user using a specific boolean expression.
 // It returns a fully loaded user if it could be found or nil on an error.
 func GetUserBy(ctx context.Context, expression postgres.BoolExpression) (*model.Users, error) {
-	query, args := postgres.SELECT(
+	statement := postgres.SELECT(
 		table.Users.ID,
 		table.Users.Username,
 		table.Users.Token,
@@ -41,21 +41,10 @@ func GetUserBy(ctx context.Context, expression postgres.BoolExpression) (*model.
 		table.Users.Status,
 		table.Users.UpdatedAt,
 		table.Users.CreatedAt,
-	).FROM(table.Users).WHERE(expression).LIMIT(1).Sql()
+	).FROM(table.Users).WHERE(expression).LIMIT(1)
 
 	user := model.Users{}
-	err := sqldb.
-		QueryRow(ctx, query, args...).
-		Scan(
-			&user.ID,
-			&user.Username,
-			&user.Token,
-			&user.UniqueID,
-			&user.Status,
-			&user.UpdatedAt,
-			&user.CreatedAt,
-		)
-
+	err := statement.QueryContext(ctx, db, &user)
 	if err != nil {
 		log.WithError(err).Error("Could not query user")
 		return nil, err

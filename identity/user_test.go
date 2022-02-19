@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	test_utils2 "encore.app/test_utils"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
 	"github.com/go-jet/jet/v2/postgres"
@@ -17,6 +18,33 @@ import (
 	"encore.app/identity/models/generated/identity/public/table"
 	"encore.app/identity/test_utils"
 )
+
+func insertUser(ctx context.Context, user *model.Users) error {
+	query, args := table.Users.INSERT(
+		table.Users.ID,
+		table.Users.Username,
+		table.Users.Token,
+		table.Users.UniqueID,
+		table.Users.Status,
+		table.Users.UpdatedAt,
+		table.Users.CreatedAt,
+	).VALUES(
+		user.ID,
+		user.Username,
+		user.Token,
+		user.UniqueID,
+		user.Status,
+		user.UpdatedAt,
+		user.CreatedAt,
+	).Sql()
+
+	_, err := sqldb.Exec(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func TestSignIn(t *testing.T) {
 	type deviceCodeResponse struct {
@@ -133,7 +161,7 @@ func TestSignIn(t *testing.T) {
 			time.Sleep(time.Duration(test_utils.DefaultDeviceCodeResponse.ExpiresIn) * time.Second)
 
 			if err != nil {
-				assert.Equal(t, tc.expected.err, err)
+				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				assert.NoError(t, err)

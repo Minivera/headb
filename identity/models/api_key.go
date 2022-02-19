@@ -11,6 +11,8 @@ import (
 	"encore.app/identity/models/generated/identity/public/table"
 )
 
+var db = sqldb.Named("identity").Stdlib()
+
 // NewApiKey generates a new API key structure from an encrypted key
 // value and a user ID. Never give plain API key values to this function.
 func NewApiKey(value string, userID int64) *model.APIKeys {
@@ -23,7 +25,7 @@ func NewApiKey(value string, userID int64) *model.APIKeys {
 // ListApiKeysForUser fetches all the API keys for a specific user, returns an empty array
 // on an error.
 func ListApiKeysForUser(ctx context.Context, userID int64) ([]*model.APIKeys, error) {
-	query, args := postgres.SELECT(
+	statement := postgres.SELECT(
 		table.APIKeys.ID,
 		table.APIKeys.Value,
 		table.APIKeys.UserID,
@@ -32,32 +34,13 @@ func ListApiKeysForUser(ctx context.Context, userID int64) ([]*model.APIKeys, er
 		table.APIKeys.UpdatedAt,
 	).FROM(table.APIKeys).WHERE(
 		table.APIKeys.UserID.EQ(postgres.Int64(userID)),
-	).Sql()
+	)
 
 	var keys []*model.APIKeys
-	rows, err := sqldb.Query(ctx, query, args...)
+	err := statement.QueryContext(ctx, db, &keys)
 	if err != nil {
-		log.WithError(err).Error("Could not query collections")
+		log.WithError(err).Error("Could not query api keys")
 		return nil, err
-	}
-
-	for rows.Next() {
-		key := &model.APIKeys{}
-
-		err = rows.Scan(
-			&key.ID,
-			&key.Value,
-			&key.UserID,
-			&key.LastUsedAt,
-			&key.UpdatedAt,
-			&key.CreatedAt,
-		)
-		if err != nil {
-			log.WithError(err).Error("Could not scan api key")
-			return nil, err
-		}
-
-		keys = append(keys, key)
 	}
 
 	return keys, nil
@@ -67,7 +50,7 @@ func ListApiKeysForUser(ctx context.Context, userID int64) ([]*model.APIKeys, er
 // if successfully fetched. This should only be called internally as
 // it risks exposing keys not owned by users if they guess the ID.
 func GetApiKey(ctx context.Context, id int64) (*model.APIKeys, error) {
-	query, args := postgres.SELECT(
+	statement := postgres.SELECT(
 		table.APIKeys.ID,
 		table.APIKeys.Value,
 		table.APIKeys.UserID,
@@ -76,13 +59,10 @@ func GetApiKey(ctx context.Context, id int64) (*model.APIKeys, error) {
 		table.APIKeys.UpdatedAt,
 	).FROM(table.APIKeys).WHERE(
 		table.APIKeys.ID.EQ(postgres.Int64(id)),
-	).LIMIT(1).Sql()
+	).LIMIT(1)
 
 	key := model.APIKeys{}
-	err := sqldb.
-		QueryRow(ctx, query, args...).
-		Scan(&key.ID, &key.Value, &key.UserID, &key.LastUsedAt, &key.UpdatedAt, &key.CreatedAt)
-
+	err := statement.QueryContext(ctx, db, &key)
 	if err != nil {
 		log.WithError(err).Error("Could not query api_key for ID")
 		return nil, err
@@ -94,7 +74,7 @@ func GetApiKey(ctx context.Context, id int64) (*model.APIKeys, error) {
 // GetApiKeyForUser gets an API key from a database ID for a specific user, returning it
 // if successfully fetched.
 func GetApiKeyForUser(ctx context.Context, id, userID int64) (*model.APIKeys, error) {
-	query, args := postgres.SELECT(
+	statement := postgres.SELECT(
 		table.APIKeys.ID,
 		table.APIKeys.Value,
 		table.APIKeys.UserID,
@@ -103,13 +83,10 @@ func GetApiKeyForUser(ctx context.Context, id, userID int64) (*model.APIKeys, er
 		table.APIKeys.UpdatedAt,
 	).FROM(table.APIKeys).WHERE(
 		table.APIKeys.ID.EQ(postgres.Int64(id)).AND(table.APIKeys.UserID.EQ(postgres.Int64(userID))),
-	).LIMIT(1).Sql()
+	).LIMIT(1)
 
 	key := model.APIKeys{}
-	err := sqldb.
-		QueryRow(ctx, query, args...).
-		Scan(&key.ID, &key.Value, &key.UserID, &key.LastUsedAt, &key.UpdatedAt, &key.CreatedAt)
-
+	err := statement.QueryContext(ctx, db, &key)
 	if err != nil {
 		log.WithError(err).Error("Could not query api_key for ID and userID")
 		return nil, err
@@ -172,7 +149,7 @@ func TransferApiKeys(ctx context.Context, oldUserID, newUserID int64) error {
 	log.WithFields(map[string]interface{}{
 		"old_user_id": oldUserID,
 		"new_user_id": newUserID,
-		"count": transferredCount,
+		"count":       transferredCount,
 	}).Info("Transferred API keys from old user to new user.")
 
 	return nil
