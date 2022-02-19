@@ -17,11 +17,11 @@ type collectionsTable struct {
 	postgres.Table
 
 	//Columns
-	ID        postgres.ColumnInteger
-	Name      postgres.ColumnString
-	UserID    postgres.ColumnInteger
-	CreatedAt postgres.ColumnTimestampz
-	UpdatedAt postgres.ColumnTimestampz
+	ID         postgres.ColumnInteger
+	Name       postgres.ColumnString
+	DatabaseID postgres.ColumnInteger
+	CreatedAt  postgres.ColumnTimestampz
+	UpdatedAt  postgres.ColumnTimestampz
 
 	AllColumns     postgres.ColumnList
 	MutableColumns postgres.ColumnList
@@ -52,24 +52,24 @@ func newCollectionsTable(schemaName, tableName, alias string) *CollectionsTable 
 
 func newCollectionsTableImpl(schemaName, tableName, alias string) collectionsTable {
 	var (
-		IDColumn        = postgres.IntegerColumn("id")
-		NameColumn      = postgres.StringColumn("name")
-		UserIDColumn    = postgres.IntegerColumn("user_id")
-		CreatedAtColumn = postgres.TimestampzColumn("created_at")
-		UpdatedAtColumn = postgres.TimestampzColumn("updated_at")
-		allColumns      = postgres.ColumnList{IDColumn, NameColumn, UserIDColumn, CreatedAtColumn, UpdatedAtColumn}
-		mutableColumns  = postgres.ColumnList{NameColumn, UserIDColumn, CreatedAtColumn, UpdatedAtColumn}
+		IDColumn         = postgres.IntegerColumn("id")
+		NameColumn       = postgres.StringColumn("name")
+		DatabaseIDColumn = postgres.IntegerColumn("database_id")
+		CreatedAtColumn  = postgres.TimestampzColumn("created_at")
+		UpdatedAtColumn  = postgres.TimestampzColumn("updated_at")
+		allColumns       = postgres.ColumnList{IDColumn, NameColumn, DatabaseIDColumn, CreatedAtColumn, UpdatedAtColumn}
+		mutableColumns   = postgres.ColumnList{NameColumn, DatabaseIDColumn, CreatedAtColumn, UpdatedAtColumn}
 	)
 
 	return collectionsTable{
 		Table: postgres.NewTable(schemaName, tableName, alias, allColumns...),
 
 		//Columns
-		ID:        IDColumn,
-		Name:      NameColumn,
-		UserID:    UserIDColumn,
-		CreatedAt: CreatedAtColumn,
-		UpdatedAt: UpdatedAtColumn,
+		ID:         IDColumn,
+		Name:       NameColumn,
+		DatabaseID: DatabaseIDColumn,
+		CreatedAt:  CreatedAtColumn,
+		UpdatedAt:  UpdatedAtColumn,
 
 		AllColumns:     allColumns,
 		MutableColumns: mutableColumns,

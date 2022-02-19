@@ -73,20 +73,28 @@ func TestListDocuments(t *testing.T) {
 		err      error
 	}
 
+	existingDatabase := &model.Databases{
+		ID:        1,
+		Name:      "test",
+		UserID:    1,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
 	validCollections := []*model.Collections{
 		{
-			ID:        2,
-			UserID:    1,
-			Name:      "test",
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:         2,
+			DatabaseID: existingDatabase.ID,
+			Name:       "test",
+			CreatedAt:  now,
+			UpdatedAt:  now,
 		},
 		{
-			ID:        3,
-			UserID:    1,
-			Name:      "test2",
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:         3,
+			DatabaseID: existingDatabase.ID,
+			Name:       "test2",
+			CreatedAt:  now,
+			UpdatedAt:  now,
 		},
 	}
 	validDocuments := []*model.Documents{
@@ -169,10 +177,13 @@ func TestListDocuments(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
+			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
+			require.NoError(t, err)
+
 			err = insertCollections(ctx, validCollections)
 			require.NoError(t, err)
 
-			err := insertDocuments(ctx, tc.existingDocuments)
+			err = insertDocuments(ctx, tc.existingDocuments)
 			require.NoError(t, err)
 
 			response, err := ListDocuments(ctx, tc.params)
@@ -195,12 +206,20 @@ func TestGetDocument(t *testing.T) {
 		err      error
 	}
 
-	validCollection := &model.Collections{
-		ID:        2,
-		UserID:    1,
+	existingDatabase := &model.Databases{
+		ID:        1,
 		Name:      "test",
+		UserID:    1,
 		CreatedAt: now,
 		UpdatedAt: now,
+	}
+
+	validCollection := &model.Collections{
+		ID:         2,
+		DatabaseID: existingDatabase.ID,
+		Name:       "test",
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 	validDocuments := []*model.Documents{
 		{
@@ -263,10 +282,13 @@ func TestGetDocument(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
+			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
+			require.NoError(t, err)
+
 			err = insertCollections(ctx, []*model.Collections{validCollection})
 			require.NoError(t, err)
 
-			err := insertDocuments(ctx, tc.existingDocuments)
+			err = insertDocuments(ctx, tc.existingDocuments)
 			require.NoError(t, err)
 
 			response, err := GetDocument(ctx, tc.params)
@@ -290,12 +312,20 @@ func TestCreateDocument(t *testing.T) {
 		err      error
 	}
 
-	validCollection := &model.Collections{
-		ID:        2,
-		UserID:    1,
+	existingDatabase := &model.Databases{
+		ID:        1,
 		Name:      "test",
+		UserID:    1,
 		CreatedAt: now,
 		UpdatedAt: now,
+	}
+
+	validCollection := &model.Collections{
+		ID:         2,
+		DatabaseID: existingDatabase.ID,
+		Name:       "test",
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	tcs := []struct {
@@ -354,7 +384,10 @@ func TestCreateDocument(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
-			err := insertCollections(ctx, []*model.Collections{validCollection})
+			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
+			require.NoError(t, err)
+
+			err = insertCollections(ctx, []*model.Collections{validCollection})
 			require.NoError(t, err)
 
 			response, err := CreateDocument(ctx, tc.params)
@@ -379,12 +412,20 @@ func TestUpdateDocument(t *testing.T) {
 		err      error
 	}
 
-	validCollection := &model.Collections{
-		ID:        2,
-		UserID:    1,
+	existingDatabase := &model.Databases{
+		ID:        1,
 		Name:      "test",
+		UserID:    1,
 		CreatedAt: now,
 		UpdatedAt: now,
+	}
+
+	validCollection := &model.Collections{
+		ID:         2,
+		DatabaseID: existingDatabase.ID,
+		Name:       "test",
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	validDocument := &model.Documents{
@@ -456,7 +497,10 @@ func TestUpdateDocument(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
-			err := insertCollections(ctx, []*model.Collections{validCollection})
+			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
+			require.NoError(t, err)
+
+			err = insertCollections(ctx, []*model.Collections{validCollection})
 			require.NoError(t, err)
 
 			err = insertDocuments(ctx, tc.existingDocuments)
@@ -482,12 +526,20 @@ func TestDeleteDocument(t *testing.T) {
 		err      error
 	}
 
-	validCollection := &model.Collections{
-		ID:        2,
-		UserID:    1,
+	existingDatabase := &model.Databases{
+		ID:        1,
 		Name:      "test",
+		UserID:    1,
 		CreatedAt: now,
 		UpdatedAt: now,
+	}
+
+	validCollection := &model.Collections{
+		ID:         2,
+		DatabaseID: existingDatabase.ID,
+		Name:       "test",
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	validDocument := &model.Documents{
@@ -542,7 +594,10 @@ func TestDeleteDocument(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
-			err := insertCollections(ctx, []*model.Collections{validCollection})
+			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
+			require.NoError(t, err)
+
+			err = insertCollections(ctx, []*model.Collections{validCollection})
 			require.NoError(t, err)
 
 			err = insertDocuments(ctx, tc.existingDocuments)

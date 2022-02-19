@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-type Collections struct {
-	ID         int64 `sql:"primary_key"`
-	Name       string
-	DatabaseID int64
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+type Databases struct {
+	ID        int64 `sql:"primary_key"`
+	Name      string
+	UserID    int64
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

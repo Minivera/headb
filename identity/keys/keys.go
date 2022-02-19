@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	apiKeyLength    = 12
-	encryptCost     = 10
+	apiKeyLength = 12
+	encryptCost  = 10
 )
 
 // GenerateApiKey will generate a new unencrypted, unencoded API key. This key it to be
@@ -46,7 +46,7 @@ func EncryptToPaseto(key string, keyID int64, encryptionSecret string) (string, 
 	now := time.Now()
 
 	jsonToken := paseto.JSONToken{
-		Issuer:     "headb",
+		Issuer: "headb",
 		// Expires in 99 years
 		Expiration: now.Add(99 * time.Hour * 365),
 	}

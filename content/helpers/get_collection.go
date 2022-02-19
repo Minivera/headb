@@ -12,7 +12,7 @@ import (
 	"encore.app/content/models/generated/content/public/model"
 )
 
-// GetCollection gets a collection from a collection ID and a user ID and returns a valid encore error
+// GetCollection gets a collection from a collection ID and a user ID, and returns a valid encore error
 // if the collection could not be fetched.
 func GetCollection(ctx context.Context, collectionID, userID int64) (*model.Collections, error) {
 	collection, err := models.GetCollectionByID(ctx, collectionID, userID)

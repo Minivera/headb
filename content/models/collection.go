@@ -11,28 +11,26 @@ import (
 	"encore.app/content/models/generated/content/public/table"
 )
 
-var db = sqldb.Named("content").Stdlib()
-
 // NewCollection generates a new collection structure from a name and the
-// associated user ID.
-func NewCollection(name string, userID int64) *model.Collections {
+// associated database ID.
+func NewCollection(name string, databaseID int64) *model.Collections {
 	return &model.Collections{
-		Name:   name,
-		UserID: userID,
+		Name:       name,
+		DatabaseID: databaseID,
 	}
 }
 
-// ListCollections lists all collections for a given user, it returns
+// ListCollections lists all collections for a given database, it returns
 // a nil collection on an error.
-func ListCollections(ctx context.Context, userID int64) ([]*model.Collections, error) {
+func ListCollections(ctx context.Context, databaseID int64) ([]*model.Collections, error) {
 	statement := postgres.SELECT(
 		table.Collections.ID,
 		table.Collections.Name,
-		table.Collections.UserID,
+		table.Collections.DatabaseID,
 		table.Collections.UpdatedAt,
 		table.Collections.CreatedAt,
 	).FROM(table.Collections).WHERE(
-		table.Collections.UserID.EQ(postgres.Int64(userID)),
+		table.Collections.DatabaseID.EQ(postgres.Int64(databaseID)),
 	)
 
 	var collections []*model.Collections
@@ -46,19 +44,22 @@ func ListCollections(ctx context.Context, userID int64) ([]*model.Collections, e
 }
 
 // GetCollectionByID fetches a single collection record given an ID and the associated
-// user ID. Returns nil on an error.
+// database ID. Returns nil on an error.
 func GetCollectionByID(ctx context.Context, id, userID int64) (*model.Collections, error) {
 	statement := postgres.SELECT(
 		table.Collections.ID,
 		table.Collections.Name,
-		table.Collections.UserID,
+		table.Collections.DatabaseID,
 		table.Collections.UpdatedAt,
 		table.Collections.CreatedAt,
 	).FROM(
-		table.Collections,
+		table.Collections.LEFT_JOIN(
+			table.Databases,
+			table.Collections.DatabaseID.EQ(table.Databases.ID),
+		),
 	).WHERE(
 		table.Collections.ID.EQ(postgres.Int64(id)).
-			AND(table.Collections.UserID.EQ(postgres.Int64(userID))),
+			AND(table.Databases.UserID.EQ(postgres.Int64(userID))),
 	).LIMIT(1)
 
 	collection := model.Collections{}
@@ -72,7 +73,7 @@ func GetCollectionByID(ctx context.Context, id, userID int64) (*model.Collection
 }
 
 // ValidateCollectionConstraint validates that no collection with the same name exists
-// for a single user.
+// for a single database.
 func ValidateCollectionConstraint(ctx context.Context, collection *model.Collections) bool {
 	query, args := postgres.SELECT(
 		table.Collections.ID,
@@ -80,13 +81,13 @@ func ValidateCollectionConstraint(ctx context.Context, collection *model.Collect
 		table.Collections,
 	).WHERE(
 		table.Collections.Name.EQ(postgres.String(collection.Name)).
-			AND(table.Collections.UserID.EQ(postgres.Int64(collection.UserID))),
+			AND(table.Collections.DatabaseID.EQ(postgres.Int64(collection.DatabaseID))),
 	).LIMIT(1).Sql()
 
 	id := 0
 	err := sqldb.QueryRow(ctx, query, args...).Scan(&id)
 	if err == nil && id != 0 {
-		log.Warning("Tried to save collection, a collection already exists for this name and user_id")
+		log.Warning("Tried to save collection, a collection already exists for this name and database_id")
 		return false
 	}
 
@@ -94,16 +95,16 @@ func ValidateCollectionConstraint(ctx context.Context, collection *model.Collect
 }
 
 // SaveCollection saves the data of the collection it used on. This method only saves
-// the name and user ID from the struct and updates the timestamps. SaveCollection will
+// the name and database ID from the struct and updates the timestamps. SaveCollection will
 // trigger an error if the constraints are not respected.
 func SaveCollection(ctx context.Context, collection *model.Collections) error {
 	if collection.ID == 0 {
 		query, args := table.Collections.INSERT(
 			table.Collections.Name,
-			table.Collections.UserID,
+			table.Collections.DatabaseID,
 		).VALUES(
 			collection.Name,
-			collection.UserID,
+			collection.DatabaseID,
 		).RETURNING(
 			table.Collections.ID,
 			table.Collections.UpdatedAt,
@@ -124,7 +125,7 @@ func SaveCollection(ctx context.Context, collection *model.Collections) error {
 
 	query, args := table.Collections.UPDATE().SET(
 		table.Collections.Name.SET(postgres.String(collection.Name)),
-		table.Collections.UserID.SET(postgres.Int64(collection.UserID)),
+		table.Collections.DatabaseID.SET(postgres.Int64(collection.DatabaseID)),
 	).WHERE(
 		table.Collections.ID.EQ(postgres.Int64(collection.ID)),
 	).RETURNING(

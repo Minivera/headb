@@ -14,20 +14,33 @@ import (
 	"encore.app/identity"
 )
 
-// ListCollectionsResponse Is the list of collections for the current user
+// ListCollectionsParams is the parameters for listing the collections of a database
+type ListCollectionsParams struct {
+	// The unique identifier of the database
+	DatabaseID int64
+}
+
+// ListCollectionsResponse is the list of collections for the given database
 type ListCollectionsResponse struct {
 	// The fetched collections
 	Collections []convert.CollectionPayload
 }
 
-// ListCollections lists all collections created by the authenticated user
+// ListCollections lists all collections created by the authenticated user in the given
+// database.
 //encore:api auth
-func ListCollections(ctx context.Context) (*ListCollectionsResponse, error) {
+func ListCollections(ctx context.Context, params *ListCollectionsParams) (*ListCollectionsResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	collections, err := models.ListCollections(ctx, userData.ID)
+	database, err := helpers.GetDatabase(ctx, params.DatabaseID, userData.ID)
 	if err != nil {
-		log.WithError(err).Warning("Could not fetch collections for this user")
+		log.WithError(err).Error("Could not find database when listing collections")
+		return nil, err
+	}
+
+	collections, err := models.ListCollections(ctx, database.ID)
+	if err != nil {
+		log.WithError(err).Warning("Could not fetch collections for this database")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not fetch collections",
@@ -68,6 +81,9 @@ func GetCollection(ctx context.Context, params *GetCollectionParams) (*GetCollec
 
 // CreateCollectionParams is the parameters for creating a collection for documents
 type CreateCollectionParams struct {
+	// The unique ID of the database to add this collection to
+	DatabaseID int64
+
 	// The name of the collection
 	Name string
 }
@@ -81,26 +97,32 @@ type CreateCollectionResponse struct {
 	Collection convert.CollectionPayload
 }
 
-// CreateCollection creates a collection for the authenticated user
+// CreateCollection creates a collection for the given database if owned by the authenticated user.
 //encore:api auth
 func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*CreateCollectionResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
-	collection := models.NewCollection(params.Name, userData.ID)
+	database, err := helpers.GetDatabase(ctx, params.DatabaseID, userData.ID)
+	if err != nil {
+		log.WithError(err).Error("Could not find database when creating a new collection")
+		return nil, err
+	}
+
+	collection := models.NewCollection(params.Name, database.ID)
 	if !models.ValidateCollectionConstraint(ctx, collection) {
 		log.WithFields(map[string]interface{}{
-			"name":    params.Name,
-			"user_id": userData.ID,
+			"name":        params.Name,
+			"database_id": database.ID,
 		}).Warning("Could not validate the constraints for collection, a collection already exists.")
 		return nil, &errs.Error{
 			Code:    errs.AlreadyExists,
-			Message: fmt.Sprintf("A collection with name `%s` already exists for this user", collection.Name),
+			Message: fmt.Sprintf("A collection with name `%s` already exists in this database", collection.Name),
 		}
 	}
 
-	err := models.SaveCollection(ctx, collection)
+	err = models.SaveCollection(ctx, collection)
 	if err != nil {
-		log.WithError(err).Error("Could not save collections for this user")
+		log.WithError(err).Error("Could not save collections for this database")
 		return nil, &errs.Error{
 			Code:    errs.Internal,
 			Message: "Could not save collection",
@@ -144,12 +166,12 @@ func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*Upd
 	collection.Name = params.Name
 	if !models.ValidateCollectionConstraint(ctx, collection) {
 		log.WithFields(map[string]interface{}{
-			"name":    params.Name,
-			"user_id": userData.ID,
+			"name":        params.Name,
+			"database_id": collection.DatabaseID,
 		}).Warning("Could not validate the constraints for collection, a collection already exists.")
 		return nil, &errs.Error{
 			Code:    errs.AlreadyExists,
-			Message: fmt.Sprintf("A collection with name `%s` already exists for this user", collection.Name),
+			Message: fmt.Sprintf("A collection with name `%s` already exists in this database", collection.Name),
 		}
 	}
 

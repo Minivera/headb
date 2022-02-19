@@ -42,13 +42,13 @@ func insertCollections(ctx context.Context, collections []*model.Collections) er
 		query, args := table.Collections.INSERT(
 			table.Collections.ID,
 			table.Collections.Name,
-			table.Collections.UserID,
+			table.Collections.DatabaseID,
 			table.Collections.UpdatedAt,
 			table.Collections.CreatedAt,
 		).VALUES(
 			collection.ID,
 			collection.Name,
-			collection.UserID,
+			collection.DatabaseID,
 			collection.UpdatedAt,
 			collection.CreatedAt,
 		).Sql()
@@ -70,31 +70,43 @@ func TestListCollections(t *testing.T) {
 		err      error
 	}
 
+	existingDatabase := &model.Databases{
+		ID:        1,
+		Name:      "test",
+		UserID:    1,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
 	validCollections := []*model.Collections{
 		{
-			ID:        2,
-			UserID:    1,
-			Name:      "test",
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:         2,
+			DatabaseID: existingDatabase.ID,
+			Name:       "test",
+			CreatedAt:  now,
+			UpdatedAt:  now,
 		},
 		{
-			ID:        3,
-			UserID:    1,
-			Name:      "test2",
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:         3,
+			DatabaseID: existingDatabase.ID,
+			Name:       "test2",
+			CreatedAt:  now,
+			UpdatedAt:  now,
 		},
 	}
 
 	tcs := []struct {
 		scenario            string
 		userData            *identity.UserData
+		params              *ListCollectionsParams
 		existingCollections []*model.Collections
 		expected            expected
 	}{
 		{
-			scenario:            "Returns a list of collections owned by a user",
+			scenario: "Returns a list of collections owned by a database",
+			params: &ListCollectionsParams{
+				DatabaseID: existingDatabase.ID,
+			},
 			userData:            &identity.UserData{ID: 1},
 			existingCollections: validCollections,
 			expected: expected{
@@ -104,12 +116,29 @@ func TestListCollections(t *testing.T) {
 			},
 		},
 		{
-			scenario:            "Returns empty when the user owns no collections",
-			userData:            &identity.UserData{ID: 2},
-			existingCollections: validCollections,
+			scenario: "Returns empty when the database has no collections",
+			params: &ListCollectionsParams{
+				DatabaseID: existingDatabase.ID,
+			},
+			userData:            &identity.UserData{ID: 1},
+			existingCollections: []*model.Collections{},
 			expected: expected{
 				response: &ListCollectionsResponse{
 					Collections: []convert.CollectionPayload{},
+				},
+			},
+		},
+		{
+			scenario: "Fails when the database to fetch collections from doesn't exist",
+			params: &ListCollectionsParams{
+				DatabaseID: -1,
+			},
+			userData:            &identity.UserData{ID: 1},
+			existingCollections: validCollections,
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.NotFound,
+					Message: "Could not find database",
 				},
 			},
 		},
@@ -120,10 +149,13 @@ func TestListCollections(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
-			err := insertCollections(ctx, tc.existingCollections)
+			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
 
-			response, err := ListCollections(ctx)
+			err = insertCollections(ctx, tc.existingCollections)
+			require.NoError(t, err)
+
+			response, err := ListCollections(ctx, tc.params)
 			if err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
@@ -143,13 +175,21 @@ func TestGetCollection(t *testing.T) {
 		err      error
 	}
 
+	existingDatabase := &model.Databases{
+		ID:        1,
+		Name:      "test",
+		UserID:    1,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
 	validCollections := []*model.Collections{
 		{
-			ID:        2,
-			UserID:    1,
-			Name:      "test",
-			CreatedAt: now,
-			UpdatedAt: now,
+			ID:         2,
+			DatabaseID: existingDatabase.ID,
+			Name:       "test",
+			CreatedAt:  now,
+			UpdatedAt:  now,
 		},
 	}
 
@@ -202,7 +242,10 @@ func TestGetCollection(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
-			err := insertCollections(ctx, tc.existingCollections)
+			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
+			require.NoError(t, err)
+
+			err = insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
 
 			response, err := GetCollection(ctx, tc.params)
@@ -226,6 +269,14 @@ func TestCreateCollection(t *testing.T) {
 		err      error
 	}
 
+	existingDatabase := &model.Databases{
+		ID:        1,
+		Name:      "test",
+		UserID:    1,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
 	tcs := []struct {
 		scenario            string
 		userData            *identity.UserData
@@ -237,7 +288,8 @@ func TestCreateCollection(t *testing.T) {
 			scenario: "Will create and return a collection",
 			userData: &identity.UserData{ID: 1},
 			params: &CreateCollectionParams{
-				Name: "test",
+				DatabaseID: existingDatabase.ID,
+				Name:       "test",
 			},
 			expected: expected{
 				response: &CreateCollectionResponse{
@@ -248,24 +300,48 @@ func TestCreateCollection(t *testing.T) {
 			},
 		},
 		{
-			scenario: "Will throw an error when a collection already exists",
+			scenario: "Will throw an error when a the database cannot be found",
 			userData: &identity.UserData{ID: 1},
 			params: &CreateCollectionParams{
-				Name: "test",
+				DatabaseID: -1,
+				Name:       "test",
 			},
 			existingCollections: []*model.Collections{
 				{
-					ID:        2,
-					UserID:    1,
-					Name:      "test",
-					CreatedAt: now,
-					UpdatedAt: now,
+					ID:         2,
+					DatabaseID: existingDatabase.ID,
+					Name:       "test",
+					CreatedAt:  now,
+					UpdatedAt:  now,
+				},
+			},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.NotFound,
+					Message: "Could not find database",
+				},
+			},
+		},
+		{
+			scenario: "Will throw an error when a collection already exists",
+			userData: &identity.UserData{ID: 1},
+			params: &CreateCollectionParams{
+				DatabaseID: existingDatabase.ID,
+				Name:       "test",
+			},
+			existingCollections: []*model.Collections{
+				{
+					ID:         2,
+					DatabaseID: existingDatabase.ID,
+					Name:       "test",
+					CreatedAt:  now,
+					UpdatedAt:  now,
 				},
 			},
 			expected: expected{
 				err: &errs.Error{
 					Code:    errs.AlreadyExists,
-					Message: "A collection with name `test` already exists for this user",
+					Message: "A collection with name `test` already exists in this database",
 				},
 			},
 		},
@@ -276,7 +352,10 @@ func TestCreateCollection(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
-			err := insertCollections(ctx, tc.existingCollections)
+			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
+			require.NoError(t, err)
+
+			err = insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
 
 			response, err := CreateCollection(ctx, tc.params)
@@ -299,12 +378,20 @@ func TestUpdateCollection(t *testing.T) {
 		err      error
 	}
 
-	validCollection := &model.Collections{
-		ID:        2,
-		UserID:    1,
+	existingDatabase := &model.Databases{
+		ID:        1,
 		Name:      "test",
+		UserID:    1,
 		CreatedAt: now,
 		UpdatedAt: now,
+	}
+
+	validCollection := &model.Collections{
+		ID:         2,
+		DatabaseID: existingDatabase.ID,
+		Name:       "test",
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	tcs := []struct {
@@ -357,7 +444,7 @@ func TestUpdateCollection(t *testing.T) {
 			expected: expected{
 				err: &errs.Error{
 					Code:    errs.AlreadyExists,
-					Message: "A collection with name `test` already exists for this user",
+					Message: "A collection with name `test` already exists in this database",
 				},
 			},
 		},
@@ -368,7 +455,10 @@ func TestUpdateCollection(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
-			err := insertCollections(ctx, tc.existingCollections)
+			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
+			require.NoError(t, err)
+
+			err = insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
 
 			response, err := UpdateCollection(ctx, tc.params)
@@ -391,12 +481,20 @@ func TestDeleteCollection(t *testing.T) {
 		err      error
 	}
 
-	validCollection := &model.Collections{
-		ID:        2,
-		UserID:    1,
+	existingDatabase := &model.Databases{
+		ID:        1,
 		Name:      "test",
+		UserID:    1,
 		CreatedAt: now,
 		UpdatedAt: now,
+	}
+
+	validCollection := &model.Collections{
+		ID:         2,
+		DatabaseID: existingDatabase.ID,
+		Name:       "test",
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 
 	tcs := []struct {
@@ -443,7 +541,10 @@ func TestDeleteCollection(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 
-			err := insertCollections(ctx, tc.existingCollections)
+			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
+			require.NoError(t, err)
+
+			err = insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
 
 			response, err := DeleteCollection(ctx, tc.params)
