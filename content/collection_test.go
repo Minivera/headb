@@ -156,11 +156,11 @@ func TestListCollections(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := ListCollections(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				compareCollections(t, tc.expected.response.Collections, response.Collections)
 			}
 		})
@@ -249,11 +249,11 @@ func TestGetCollection(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := GetCollection(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected.response.Collection.ID, response.Collection.ID)
 				assert.Equal(t, tc.expected.response.Collection.Name, response.Collection.Name)
 			}
@@ -359,11 +359,11 @@ func TestCreateCollection(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := CreateCollection(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected.response.Collection.Name, response.Collection.Name)
 			}
 		})
@@ -462,11 +462,11 @@ func TestUpdateCollection(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := UpdateCollection(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected.response.Collection.Name, response.Collection.Name)
 			}
 		})
@@ -548,11 +548,11 @@ func TestDeleteCollection(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := DeleteCollection(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected.response.Collection.Name, response.Collection.Name)
 			}
 		})

@@ -160,11 +160,11 @@ func TestSignIn(t *testing.T) {
 			// Sleep for a few seconds to make sure the goroutine can finish
 			time.Sleep(time.Duration(test_utils.DefaultDeviceCodeResponse.ExpiresIn) * time.Second)
 
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotEmpty(t, response.Message)
 				assert.NotEmpty(t, response.ApiKey)
 			}

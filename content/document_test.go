@@ -187,11 +187,11 @@ func TestListDocuments(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := ListDocuments(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				compareDocuments(t, tc.expected.response.Documents, response.Documents)
 			}
 		})
@@ -292,11 +292,11 @@ func TestGetDocument(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := GetDocument(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected.response.Document.ID, response.Document.ID)
 				assert.Equal(t, tc.expected.response.Document.Content, response.Document.Content)
 			}
@@ -392,12 +392,12 @@ func TestCreateDocument(t *testing.T) {
 
 			response, err := CreateDocument(ctx, tc.params)
 			fmt.Printf("%s: %v", tc.scenario, string(tc.params.Content))
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
 				log.Warningf("maybe nil %s: %v", tc.scenario, err)
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, string(tc.expected.response.Document.Content), string(response.Document.Content))
 			}
 		})
@@ -507,11 +507,11 @@ func TestUpdateDocument(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := UpdateDocument(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, string(tc.expected.response.Document.Content), string(response.Document.Content))
 			}
 		})
@@ -604,11 +604,11 @@ func TestDeleteDocument(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := DeleteDocument(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, string(tc.expected.response.Document.Content), string(response.Document.Content))
 			}
 		})

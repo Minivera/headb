@@ -98,11 +98,11 @@ func TestGenerateApiKey(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := GenerateApiKey(ctx)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.NotEmpty(t, response.ApiKey)
 			}
 		})
@@ -174,11 +174,11 @@ func TestListApiKeys(t *testing.T) {
 			}
 
 			response, err := ListApiKeys(ctx)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, response.Message, tc.expected.response.Message)
 
 				assert.Len(t, response.Keys, len(tc.expected.response.Keys))
@@ -281,11 +281,11 @@ func TestGetUserForApiKeyInternal(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := GetUserForApiKeyInternal(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, response.KeyID, tc.expected.response.KeyID)
 				assert.Equal(t, response.User.ID, tc.expected.response.User.ID)
 
@@ -374,11 +374,11 @@ func TestDeleteApiKey(t *testing.T) {
 
 			response, err := DeleteApiKey(ctx, tc.params)
 			log.Errorf("test %v", err)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, response.Message, tc.expected.response.Message)
 
 				_, err := models.GetApiKey(ctx, tc.params.APIKeyID)

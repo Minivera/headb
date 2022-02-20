@@ -124,11 +124,11 @@ func TestListDatabases(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := ListDatabases(ctx)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				compareDatabases(t, tc.expected.response.Databases, response.Databases)
 			}
 		})
@@ -206,11 +206,11 @@ func TestGetDatabase(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := GetDatabase(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected.response.Database.ID, response.Database.ID)
 				assert.Equal(t, tc.expected.response.Database.Name, response.Database.Name)
 			}
@@ -280,11 +280,11 @@ func TestCreateDatabase(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := CreateDatabase(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected.response.Database.Name, response.Database.Name)
 			}
 		})
@@ -372,11 +372,11 @@ func TestUpdateDatabase(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := UpdateDatabase(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected.response.Database.Name, response.Database.Name)
 			}
 		})
@@ -447,11 +447,11 @@ func TestDeleteDatabase(t *testing.T) {
 			require.NoError(t, err)
 
 			response, err := DeleteDatabase(ctx, tc.params)
-			if err != nil {
+			if tc.expected.err != nil {
 				test_utils2.CompareErrors(t, tc.expected.err, err)
 				assert.Nil(t, response)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				assert.Equal(t, tc.expected.response.Database.Name, response.Database.Name)
 			}
 		})

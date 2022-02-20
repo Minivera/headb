@@ -1,7 +1,7 @@
 CREATE TABLE "databases" (
    id BIGSERIAL PRIMARY KEY,
    name VARCHAR(255) NOT NULL,
-   user_id BIGSERIAL NOT NULL,
+   user_id BIGINT NOT NULL,
    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
