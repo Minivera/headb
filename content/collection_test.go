@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	test_utils2 "encore.app/test_utils"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
@@ -18,6 +17,9 @@ import (
 	"encore.app/content/models/generated/content/public/table"
 	"encore.app/content/test_utils"
 	"encore.app/identity"
+	"encore.app/permissions"
+	test_utils_permissions "encore.app/permissions/test_utils"
+	test_utils2 "encore.app/test_utils"
 )
 
 func compareCollections(t *testing.T, expected, actual []convert.CollectionPayload) {
@@ -98,6 +100,7 @@ func TestListCollections(t *testing.T) {
 	tcs := []struct {
 		scenario            string
 		userData            *identity.UserData
+		userCan             *string
 		params              *ListCollectionsParams
 		existingCollections []*model.Collections
 		expected            expected
@@ -107,7 +110,11 @@ func TestListCollections(t *testing.T) {
 			params: &ListCollectionsParams{
 				DatabaseID: existingDatabase.ID,
 			},
-			userData:            &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan:             test_utils.StringPointer("read"),
 			existingCollections: validCollections,
 			expected: expected{
 				response: &ListCollectionsResponse{
@@ -120,7 +127,11 @@ func TestListCollections(t *testing.T) {
 			params: &ListCollectionsParams{
 				DatabaseID: existingDatabase.ID,
 			},
-			userData:            &identity.UserData{ID: 1},
+			userCan: test_utils.StringPointer("read"),
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
 			existingCollections: []*model.Collections{},
 			expected: expected{
 				response: &ListCollectionsResponse{
@@ -133,12 +144,33 @@ func TestListCollections(t *testing.T) {
 			params: &ListCollectionsParams{
 				DatabaseID: -1,
 			},
-			userData:            &identity.UserData{ID: 1},
+			userCan: test_utils.StringPointer("read"),
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
 			existingCollections: validCollections,
 			expected: expected{
 				err: &errs.Error{
 					Code:    errs.NotFound,
 					Message: "Could not find database",
+				},
+			},
+		},
+		{
+			scenario: "Fails when the key cannot read the database",
+			params: &ListCollectionsParams{
+				DatabaseID: existingDatabase.ID,
+			},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			existingCollections: validCollections,
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to read the database",
 				},
 			},
 		},
@@ -148,12 +180,23 @@ func TestListCollections(t *testing.T) {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
 
 			err = insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID:      1,
+					DatabaseID: &existingDatabase.ID,
+					UserID:     1,
+					Role:       *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := ListCollections(ctx, tc.params)
 			if tc.expected.err != nil {
@@ -196,13 +239,18 @@ func TestGetCollection(t *testing.T) {
 	tcs := []struct {
 		scenario            string
 		userData            *identity.UserData
+		userCan             *string
 		params              *GetCollectionParams
 		existingCollections []*model.Collections
 		expected            expected
 	}{
 		{
-			scenario:            "Returns a collection by ID, owned by a user",
-			userData:            &identity.UserData{ID: 1},
+			scenario: "Returns a collection by ID, owned by a user",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan:             test_utils.StringPointer("read"),
 			params:              &GetCollectionParams{ID: validCollections[0].ID},
 			existingCollections: validCollections,
 			expected: expected{
@@ -212,8 +260,12 @@ func TestGetCollection(t *testing.T) {
 			},
 		},
 		{
-			scenario:            "Returns an error when the collection is not found",
-			userData:            &identity.UserData{ID: 1},
+			scenario: "Returns an error when the collection is not found",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan:             test_utils.StringPointer("read"),
 			params:              &GetCollectionParams{ID: 3},
 			existingCollections: validCollections,
 			expected: expected{
@@ -224,8 +276,12 @@ func TestGetCollection(t *testing.T) {
 			},
 		},
 		{
-			scenario:            "Returns an error when the user does not own the collection",
-			userData:            &identity.UserData{ID: 2},
+			scenario: "Returns an error when the user does not own the collection",
+			userData: &identity.UserData{
+				ID:    2,
+				KeyID: 1,
+			},
+			userCan:             test_utils.StringPointer("read"),
 			params:              &GetCollectionParams{ID: validCollections[0].ID},
 			existingCollections: validCollections,
 			expected: expected{
@@ -235,18 +291,44 @@ func TestGetCollection(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Fails when the key cannot read the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params:              &GetCollectionParams{ID: validCollections[0].ID},
+			existingCollections: validCollections,
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to read the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
 
 			err = insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID:      1,
+					DatabaseID: &existingDatabase.ID,
+					UserID:     1,
+					Role:       *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := GetCollection(ctx, tc.params)
 			if tc.expected.err != nil {
@@ -280,13 +362,18 @@ func TestCreateCollection(t *testing.T) {
 	tcs := []struct {
 		scenario            string
 		userData            *identity.UserData
+		userCan             *string
 		existingCollections []*model.Collections
 		params              *CreateCollectionParams
 		expected            expected
 	}{
 		{
 			scenario: "Will create and return a collection",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &CreateCollectionParams{
 				DatabaseID: existingDatabase.ID,
 				Name:       "test",
@@ -301,7 +388,11 @@ func TestCreateCollection(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when a the database cannot be found",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &CreateCollectionParams{
 				DatabaseID: -1,
 				Name:       "test",
@@ -324,7 +415,11 @@ func TestCreateCollection(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when a collection already exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &CreateCollectionParams{
 				DatabaseID: existingDatabase.ID,
 				Name:       "test",
@@ -345,18 +440,46 @@ func TestCreateCollection(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Will throw an error fi the user cannot write to the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params: &CreateCollectionParams{
+				DatabaseID: existingDatabase.ID,
+				Name:       "test",
+			},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to write to the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
 
 			err = insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID:      1,
+					DatabaseID: &existingDatabase.ID,
+					UserID:     1,
+					Role:       *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := CreateCollection(ctx, tc.params)
 			if tc.expected.err != nil {
@@ -397,13 +520,18 @@ func TestUpdateCollection(t *testing.T) {
 	tcs := []struct {
 		scenario            string
 		userData            *identity.UserData
+		userCan             *string
 		existingCollections []*model.Collections
 		params              *UpdateCollectionParams
 		expected            expected
 	}{
 		{
 			scenario: "Will update an existing collection and return its data",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &UpdateCollectionParams{
 				ID:   validCollection.ID,
 				Name: "updated",
@@ -420,7 +548,11 @@ func TestUpdateCollection(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when the collection does not exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &UpdateCollectionParams{
 				ID:   -1,
 				Name: "updated",
@@ -435,7 +567,11 @@ func TestUpdateCollection(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when a collection with this name already exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &UpdateCollectionParams{
 				ID:   validCollection.ID,
 				Name: validCollection.Name,
@@ -448,18 +584,47 @@ func TestUpdateCollection(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Will fail if the key cannot write to the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params: &UpdateCollectionParams{
+				ID:   validCollection.ID,
+				Name: "updated",
+			},
+			existingCollections: []*model.Collections{validCollection},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to write to the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
 
 			err = insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID:      1,
+					DatabaseID: &existingDatabase.ID,
+					UserID:     1,
+					Role:       *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := UpdateCollection(ctx, tc.params)
 			if tc.expected.err != nil {
@@ -500,13 +665,18 @@ func TestDeleteCollection(t *testing.T) {
 	tcs := []struct {
 		scenario            string
 		userData            *identity.UserData
+		userCan             *string
 		existingCollections []*model.Collections
 		params              *DeleteCollectionParams
 		expected            expected
 	}{
 		{
 			scenario: "Will delete an existing collection and return its data",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &DeleteCollectionParams{
 				ID: validCollection.ID,
 			},
@@ -522,7 +692,11 @@ func TestDeleteCollection(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when the collection does not exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &DeleteCollectionParams{
 				ID: -1,
 			},
@@ -534,18 +708,46 @@ func TestDeleteCollection(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Will fail if the key cannot write to the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params: &DeleteCollectionParams{
+				ID: validCollection.ID,
+			},
+			existingCollections: []*model.Collections{validCollection},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to write to the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
 
 			err = insertCollections(ctx, tc.existingCollections)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID:      1,
+					DatabaseID: &existingDatabase.ID,
+					UserID:     1,
+					Role:       *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := DeleteCollection(ctx, tc.params)
 			if tc.expected.err != nil {

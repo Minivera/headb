@@ -84,7 +84,7 @@ func ValidateDatabaseConstraint(ctx context.Context, database *model.Databases) 
 	).LIMIT(1).Sql()
 
 	id := 0
-	err := sqldb.QueryRow(ctx, query, args...).Scan(&id)
+	err := db.QueryRowContext(ctx, query, args...).Scan(&id)
 	if err == nil && id != 0 {
 		log.Warning("Tried to save database, a database already exists for this name and user_id")
 		return false
@@ -110,8 +110,8 @@ func SaveDatabase(ctx context.Context, database *model.Databases) error {
 			table.Databases.CreatedAt,
 		).Sql()
 
-		err := sqldb.
-			QueryRow(ctx, query, args...).
+		err := db.
+			QueryRowContext(ctx, query, args...).
 			Scan(&database.ID, &database.UpdatedAt, &database.CreatedAt)
 
 		if err != nil {
@@ -133,8 +133,8 @@ func SaveDatabase(ctx context.Context, database *model.Databases) error {
 		table.Databases.CreatedAt,
 	).Sql()
 
-	err := sqldb.
-		QueryRow(ctx, query, args...).
+	err := db.
+		QueryRowContext(ctx, query, args...).
 		Scan(&database.ID, &database.UpdatedAt, &database.CreatedAt)
 
 	if err != nil {
@@ -154,7 +154,7 @@ func DeleteDatabase(ctx context.Context, database *model.Databases) error {
 		Sql()
 
 	deletedID := 0
-	err := sqldb.QueryRow(ctx, query, args...).Scan(&deletedID)
+	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
 	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete database")
 		return err

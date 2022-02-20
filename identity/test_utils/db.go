@@ -7,12 +7,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var db = sqldb.Named("identity").Stdlib()
+
 func Cleanup(ctx context.Context) error {
 	query := `
 		TRUNCATE api_keys, users;
 	`
 
-	_, err := sqldb.Exec(ctx, query)
+	_, err := db.ExecContext(ctx, query)
 	if err != nil {
 		log.WithError(err).Error("Could not clean db")
 	}

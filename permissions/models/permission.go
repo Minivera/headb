@@ -107,8 +107,8 @@ func CreatePermissionSet(ctx context.Context, permissionSet *model.Permissions) 
 		table.Permissions.CreatedAt,
 	).Sql()
 
-	err := sqldb.
-		QueryRow(ctx, query, args...).
+	err := db.
+		QueryRowContext(ctx, query, args...).
 		Scan(&permissionSet.ID, &permissionSet.UpdatedAt, &permissionSet.CreatedAt)
 
 	if err != nil {
@@ -129,7 +129,7 @@ func DeletePermissionSet(ctx context.Context, permissionSet *model.Permissions) 
 		Sql()
 
 	deletedID := 0
-	err := sqldb.QueryRow(ctx, query, args...).Scan(&deletedID)
+	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
 	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete permissionSet")
 		return err

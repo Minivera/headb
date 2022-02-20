@@ -38,6 +38,13 @@ func ListCollections(ctx context.Context, params *ListCollectionsParams) (*ListC
 		return nil, err
 	}
 
+	if !helpers.CanReadDatabase(ctx, database.ID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to read the database",
+		}
+	}
+
 	collections, err := models.ListCollections(ctx, database.ID)
 	if err != nil {
 		log.WithError(err).Warning("Could not fetch collections for this database")
@@ -74,6 +81,13 @@ func GetCollection(ctx context.Context, params *GetCollectionParams) (*GetCollec
 		return nil, err
 	}
 
+	if !helpers.CanReadDatabase(ctx, collection.DatabaseID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to read the database",
+		}
+	}
+
 	return &GetCollectionResponse{
 		Collection: convert.CollectionModelToPayload(collection),
 	}, nil
@@ -106,6 +120,13 @@ func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*Cre
 	if err != nil {
 		log.WithError(err).Error("Could not find database when creating a new collection")
 		return nil, err
+	}
+
+	if !helpers.CanWriteDatabase(ctx, database.ID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to write to the database",
+		}
 	}
 
 	collection := models.NewCollection(params.Name, database.ID)
@@ -163,6 +184,13 @@ func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*Upd
 		return nil, err
 	}
 
+	if !helpers.CanWriteDatabase(ctx, collection.DatabaseID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to write to the database",
+		}
+	}
+
 	collection.Name = params.Name
 	if !models.ValidateCollectionConstraint(ctx, collection) {
 		log.WithFields(map[string]interface{}{
@@ -213,6 +241,13 @@ func DeleteCollection(ctx context.Context, params *DeleteCollectionParams) (*Del
 	collection, err := helpers.GetCollection(ctx, params.ID, userData.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	if !helpers.CanWriteDatabase(ctx, collection.DatabaseID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to write to the database",
+		}
 	}
 
 	err = models.DeleteCollection(ctx, collection)

@@ -25,6 +25,13 @@ type ListDatabasesResponse struct {
 func ListDatabases(ctx context.Context) (*ListDatabasesResponse, error) {
 	userData := auth.Data().(*identity.UserData)
 
+	if !helpers.CanAdmin(ctx, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key cannot be used for admin operations",
+		}
+	}
+
 	databases, err := models.ListDatabase(ctx, userData.ID)
 	if err != nil {
 		log.WithError(err).Warning("Could not fetch databases for the authenticated user")
@@ -61,6 +68,13 @@ func GetDatabase(ctx context.Context, params *GetDatabaseParams) (*GetDatabaseRe
 		return nil, err
 	}
 
+	if !helpers.CanReadDatabase(ctx, database.ID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to read the database",
+		}
+	}
+
 	return &GetDatabaseResponse{
 		Database: convert.DatabaseModelToPayload(database),
 	}, nil
@@ -85,6 +99,13 @@ type CreateDatabaseResponse struct {
 //encore:api auth
 func CreateDatabase(ctx context.Context, params *CreateDatabaseParams) (*CreateDatabaseResponse, error) {
 	userData := auth.Data().(*identity.UserData)
+
+	if !helpers.CanAdmin(ctx, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key cannot be used for admin operations",
+		}
+	}
 
 	database := models.NewDatabase(params.Name, userData.ID)
 	if !models.ValidateDatabaseConstraint(ctx, database) {
@@ -141,6 +162,13 @@ func UpdateDatabase(ctx context.Context, params *UpdateDatabaseParams) (*UpdateD
 		return nil, err
 	}
 
+	if !helpers.CanAdminDatabase(ctx, database.ID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to administrate the database",
+		}
+	}
+
 	database.Name = params.Name
 	if !models.ValidateDatabaseConstraint(ctx, database) {
 		log.WithFields(map[string]interface{}{
@@ -191,6 +219,13 @@ func DeleteDatabase(ctx context.Context, params *DeleteDatabaseParams) (*DeleteD
 	database, err := helpers.GetDatabase(ctx, params.ID, userData.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	if !helpers.CanAdminDatabase(ctx, database.ID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to administrate the database",
+		}
 	}
 
 	err = models.DeleteDatabase(ctx, database)

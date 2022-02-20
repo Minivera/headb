@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 
-	"encore.dev/storage/sqldb"
 	"github.com/go-jet/jet/v2/postgres"
 	log "github.com/sirupsen/logrus"
 
@@ -92,8 +91,8 @@ func SaveDocument(ctx context.Context, document *model.Documents) error {
 			table.Documents.CreatedAt,
 		).Sql()
 
-		err := sqldb.
-			QueryRow(ctx, query, args...).
+		err := db.
+			QueryRowContext(ctx, query, args...).
 			Scan(&document.ID, &document.UpdatedAt, &document.CreatedAt)
 
 		if err != nil {
@@ -114,8 +113,8 @@ func SaveDocument(ctx context.Context, document *model.Documents) error {
 		table.Documents.CreatedAt,
 	).Sql()
 
-	err := sqldb.
-		QueryRow(ctx, query, args...).
+	err := db.
+		QueryRowContext(ctx, query, args...).
 		Scan(&document.ID, &document.UpdatedAt, &document.CreatedAt)
 
 	if err != nil {
@@ -135,7 +134,7 @@ func DeleteDocument(ctx context.Context, document *model.Documents) error {
 		Sql()
 
 	deletedID := 0
-	err := sqldb.QueryRow(ctx, query, args...).Scan(&deletedID)
+	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
 	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete document")
 		return err

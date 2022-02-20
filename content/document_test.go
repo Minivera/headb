@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	test_utils2 "encore.app/test_utils"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
@@ -21,6 +20,9 @@ import (
 	"encore.app/content/models/generated/content/public/table"
 	"encore.app/content/test_utils"
 	"encore.app/identity"
+	"encore.app/permissions"
+	test_utils_permissions "encore.app/permissions/test_utils"
+	test_utils2 "encore.app/test_utils"
 )
 
 func compareDocuments(t *testing.T, expected, actual []convert.DocumentPayload) {
@@ -119,13 +121,18 @@ func TestListDocuments(t *testing.T) {
 	tcs := []struct {
 		scenario          string
 		userData          *identity.UserData
+		userCan           *string
 		params            *ListDocumentsParams
 		existingDocuments []*model.Documents
 		expected          expected
 	}{
 		{
 			scenario: "Returns a list of documents owned by a user",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("read"),
 			params: &ListDocumentsParams{
 				CollectionID: validCollections[0].ID,
 			},
@@ -138,7 +145,11 @@ func TestListDocuments(t *testing.T) {
 		},
 		{
 			scenario: "Returns empty when the collection owns no documents",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("read"),
 			params: &ListDocumentsParams{
 				CollectionID: validCollections[0].ID,
 			},
@@ -159,7 +170,11 @@ func TestListDocuments(t *testing.T) {
 		},
 		{
 			scenario: "Throws an error when the collection does not exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("read"),
 			params: &ListDocumentsParams{
 				CollectionID: -1,
 			},
@@ -170,12 +185,30 @@ func TestListDocuments(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Fails when the user cannot read the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params: &ListDocumentsParams{
+				CollectionID: validCollections[0].ID,
+			},
+			existingDocuments: validDocuments,
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to read the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
@@ -185,6 +218,16 @@ func TestListDocuments(t *testing.T) {
 
 			err = insertDocuments(ctx, tc.existingDocuments)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID:      1,
+					DatabaseID: &existingDatabase.ID,
+					UserID:     1,
+					Role:       *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := ListDocuments(ctx, tc.params)
 			if tc.expected.err != nil {
@@ -236,13 +279,18 @@ func TestGetDocument(t *testing.T) {
 	tcs := []struct {
 		scenario          string
 		userData          *identity.UserData
+		userCan           *string
 		params            *GetDocumentParams
 		existingDocuments []*model.Documents
 		expected          expected
 	}{
 		{
-			scenario:          "Returns a document by ID, owned by a user",
-			userData:          &identity.UserData{ID: 1},
+			scenario: "Returns a document by ID, owned by a user",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan:           test_utils.StringPointer("read"),
 			params:            &GetDocumentParams{ID: validDocuments[0].ID},
 			existingDocuments: validDocuments,
 			expected: expected{
@@ -252,8 +300,12 @@ func TestGetDocument(t *testing.T) {
 			},
 		},
 		{
-			scenario:          "Returns an error when the document is not found",
-			userData:          &identity.UserData{ID: 1},
+			scenario: "Returns an error when the document is not found",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan:           test_utils.StringPointer("read"),
 			params:            &GetDocumentParams{ID: -1},
 			existingDocuments: validDocuments,
 			expected: expected{
@@ -264,8 +316,12 @@ func TestGetDocument(t *testing.T) {
 			},
 		},
 		{
-			scenario:          "Returns an error when the user does not own the document",
-			userData:          &identity.UserData{ID: -1},
+			scenario: "Returns an error when the user does not own the document",
+			userData: &identity.UserData{
+				ID:    -1,
+				KeyID: 1,
+			},
+			userCan:           test_utils.StringPointer("read"),
 			params:            &GetDocumentParams{ID: validDocuments[0].ID},
 			existingDocuments: validDocuments,
 			expected: expected{
@@ -275,12 +331,28 @@ func TestGetDocument(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Returns an error when the key cannot access the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params:            &GetDocumentParams{ID: validDocuments[0].ID},
+			existingDocuments: validDocuments,
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to read the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
@@ -290,6 +362,16 @@ func TestGetDocument(t *testing.T) {
 
 			err = insertDocuments(ctx, tc.existingDocuments)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID:      1,
+					DatabaseID: &existingDatabase.ID,
+					UserID:     1,
+					Role:       *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := GetDocument(ctx, tc.params)
 			if tc.expected.err != nil {
@@ -331,12 +413,17 @@ func TestCreateDocument(t *testing.T) {
 	tcs := []struct {
 		scenario string
 		userData *identity.UserData
+		userCan  *string
 		params   *CreateDocumentParams
 		expected expected
 	}{
 		{
 			scenario: "Will create and return a document",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &CreateDocumentParams{
 				CollectionID: validCollection.ID,
 				Content:      json.RawMessage(`{"foo": "bar"}`),
@@ -351,7 +438,11 @@ func TestCreateDocument(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when the collection does not exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &CreateDocumentParams{
 				CollectionID: -1,
 				Content:      json.RawMessage(`{"foo": "bar"}`),
@@ -365,7 +456,11 @@ func TestCreateDocument(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when the content is not JSON",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &CreateDocumentParams{
 				CollectionID: validCollection.ID,
 				Content:      json.RawMessage("test"),
@@ -377,18 +472,46 @@ func TestCreateDocument(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Will return an error when the key cannot write to the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params: &CreateDocumentParams{
+				CollectionID: validCollection.ID,
+				Content:      json.RawMessage(`{"foo": "bar"}`),
+			},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to write to the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
 
 			err = insertCollections(ctx, []*model.Collections{validCollection})
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID:      1,
+					DatabaseID: &existingDatabase.ID,
+					UserID:     1,
+					Role:       *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := CreateDocument(ctx, tc.params)
 			fmt.Printf("%s: %v", tc.scenario, string(tc.params.Content))
@@ -439,13 +562,18 @@ func TestUpdateDocument(t *testing.T) {
 	tcs := []struct {
 		scenario          string
 		userData          *identity.UserData
+		userCan           *string
 		existingDocuments []*model.Documents
 		params            *UpdateDocumentParams
 		expected          expected
 	}{
 		{
 			scenario: "Will update an existing document and return its data",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &UpdateDocumentParams{
 				ID:      validDocument.ID,
 				Content: json.RawMessage(`{"foo": "updated"}`),
@@ -462,7 +590,11 @@ func TestUpdateDocument(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when the document does not exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &UpdateDocumentParams{
 				ID:      -1,
 				Content: json.RawMessage(`{"foo": "updated"}`),
@@ -477,7 +609,11 @@ func TestUpdateDocument(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when the JSON is not valid",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &UpdateDocumentParams{
 				ID:      validDocument.ID,
 				Content: json.RawMessage("test"),
@@ -490,12 +626,31 @@ func TestUpdateDocument(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Will return an error when the key cannot write to the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params: &UpdateDocumentParams{
+				ID:      validDocument.ID,
+				Content: json.RawMessage(`{"foo": "updated"}`),
+			},
+			existingDocuments: []*model.Documents{validDocument},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to write to the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
@@ -505,6 +660,16 @@ func TestUpdateDocument(t *testing.T) {
 
 			err = insertDocuments(ctx, tc.existingDocuments)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID:      1,
+					DatabaseID: &existingDatabase.ID,
+					UserID:     1,
+					Role:       *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := UpdateDocument(ctx, tc.params)
 			if tc.expected.err != nil {
@@ -553,13 +718,18 @@ func TestDeleteDocument(t *testing.T) {
 	tcs := []struct {
 		scenario          string
 		userData          *identity.UserData
+		userCan           *string
 		existingDocuments []*model.Documents
 		params            *DeleteDocumentParams
 		expected          expected
 	}{
 		{
 			scenario: "Will delete an existing document and return its data",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &DeleteDocumentParams{
 				ID: validDocument.ID,
 			},
@@ -575,7 +745,11 @@ func TestDeleteDocument(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when the document does not exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("write"),
 			params: &DeleteDocumentParams{
 				ID: -1,
 			},
@@ -587,12 +761,30 @@ func TestDeleteDocument(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Will fail when the key cannot write to the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params: &DeleteDocumentParams{
+				ID: validDocument.ID,
+			},
+			existingDocuments: []*model.Documents{validDocument},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to write to the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, []*model.Databases{existingDatabase})
 			require.NoError(t, err)
@@ -602,6 +794,16 @@ func TestDeleteDocument(t *testing.T) {
 
 			err = insertDocuments(ctx, tc.existingDocuments)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID:      1,
+					DatabaseID: &existingDatabase.ID,
+					UserID:     1,
+					Role:       *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := DeleteDocument(ctx, tc.params)
 			if tc.expected.err != nil {

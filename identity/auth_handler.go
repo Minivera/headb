@@ -4,9 +4,8 @@ import (
 	"context"
 	"strconv"
 
-	"encore.dev/beta/errs"
-
 	"encore.dev/beta/auth"
+	"encore.dev/beta/errs"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/identity/models/generated/identity/public/model"

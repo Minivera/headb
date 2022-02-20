@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 
-	"encore.app/permissions/models"
-	"encore.app/permissions/models/generated/permissions/public/model"
 	"encore.dev/beta/errs"
 	"github.com/go-jet/jet/v2/qrm"
 	log "github.com/sirupsen/logrus"
+
+	content_models "encore.app/content/models"
+	"encore.app/permissions/models"
+	"encore.app/permissions/models/generated/permissions/public/model"
 )
 
 // AddPermissionSetParams is the params to add a new permissions set to validate
@@ -16,6 +18,10 @@ import (
 type AddPermissionSetParams struct {
 	// The unique ID of the key to assign this permission to
 	KeyID int64
+
+	// The unique ID of the user assigned to this key and database. To validate
+	// ownership when creating.
+	UserID int64
 
 	// The unique ID of the database to assign this permission to, if any
 	DatabaseID *int64
@@ -42,6 +48,18 @@ func AddPermissionSet(ctx context.Context, params *AddPermissionSetParams) (*Add
 		return nil, &errs.Error{
 			Code:    errs.InvalidArgument,
 			Message: "Selected role is not valid, must be one of `admin`, `write`, or `read`",
+		}
+	}
+
+	if params.DatabaseID != nil {
+		// Get the database if the key was created for a specific database
+		// use the models directly here to avoid cycling dependencies.
+		_, err := content_models.GetDatabaseByID(ctx, *params.DatabaseID, params.UserID)
+		if err != nil {
+			return nil, &errs.Error{
+				Code:    errs.NotFound,
+				Message: "Database could not be found",
+			}
 		}
 	}
 

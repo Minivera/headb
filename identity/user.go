@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"encore.app/permissions"
 	"encore.dev/beta/errs"
 	log "github.com/sirupsen/logrus"
 
@@ -56,9 +57,19 @@ func SignIn(ctx context.Context) (*SignInResponse, error) {
 		}
 	}
 
-	apiKey, _, err := createKeyForUser(ctx, user)
+	apiKey, key, err := createKeyForUser(ctx, user)
 	if err != nil {
 		log.WithError(err).Error("Could not create an API key for the temporary user")
+		return nil, err
+	}
+
+	_, err = permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+		KeyID:  key.ID,
+		UserID: user.ID,
+		Role:   "admin",
+	})
+	if err != nil {
+		log.WithError(err).Error("Could not create permission set for api key")
 		return nil, err
 	}
 
@@ -77,8 +88,8 @@ func SignIn(ctx context.Context) (*SignInResponse, error) {
 			"Sign-in process started, please open the following URL in your "+
 				"browser to authenticate with GitHub. %s and copy this device code "+
 				"when prompted %s. All future requests should use the API key from this "+
-				"response for authentication. Save this key somewhere, it will not be "+
-				"available again.",
+				"response for authentication or a newly created key. Save this key somewhere, "+
+				"it will not be available again and you will not be able to recreate an admin key.",
 			deviceCode.VerificationUri,
 			deviceCode.UserCode,
 		),

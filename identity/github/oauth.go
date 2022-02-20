@@ -128,6 +128,13 @@ func (c OAuthClient) RequestDeviceCode() (DeviceCodeResponse, error) {
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode > 400 {
+		log.WithFields(log.Fields{
+			"status_code": response.StatusCode,
+		}).WithError(err).Error("Could not request device code, request error")
+		return DeviceCodeResponse{}, fmt.Errorf("could not request device code, %s error", response.StatusCode)
+	}
+
 	resp := DeviceCodeResponse{}
 	err = json.NewDecoder(response.Body).Decode(&resp)
 	if err != nil {

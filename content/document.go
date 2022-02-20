@@ -36,6 +36,13 @@ func ListDocuments(ctx context.Context, params *ListDocumentsParams) (*ListDocum
 		return nil, err
 	}
 
+	if !helpers.CanReadDatabase(ctx, collection.DatabaseID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to read the database",
+		}
+	}
+
 	documents, err := models.ListDocuments(ctx, collection.ID)
 	if err != nil {
 		log.WithError(err).Error("Could not fetch documents for collection")
@@ -81,6 +88,18 @@ func GetDocument(ctx context.Context, params *GetDocumentParams) (*GetDocumentRe
 		return nil, err
 	}
 
+	collection, err := helpers.GetCollection(ctx, document.CollectionID, userData.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !helpers.CanReadDatabase(ctx, collection.DatabaseID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to read the database",
+		}
+	}
+
 	payload, err := convert.DocumentModelToPayload(document)
 	if err != nil {
 		log.WithError(err).Error("Could not convert documents to API safe version")
@@ -121,6 +140,13 @@ func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateD
 	collection, err := helpers.GetCollection(ctx, params.CollectionID, userData.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	if !helpers.CanWriteDatabase(ctx, collection.DatabaseID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to write to the database",
+		}
 	}
 
 	_, err = params.Content.MarshalJSON()
@@ -186,6 +212,18 @@ func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateD
 		return nil, err
 	}
 
+	collection, err := helpers.GetCollection(ctx, document.CollectionID, userData.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !helpers.CanWriteDatabase(ctx, collection.DatabaseID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to write to the database",
+		}
+	}
+
 	_, err = params.Content.MarshalJSON()
 	if string(params.Content) == "null" || err != nil {
 		log.WithError(err).Warning("Could not validate JSON on document request")
@@ -244,6 +282,18 @@ func DeleteDocument(ctx context.Context, params *DeleteDocumentParams) (*DeleteD
 	document, err := helpers.GetDocument(ctx, params.ID, userData.ID)
 	if err != nil {
 		return nil, err
+	}
+
+	collection, err := helpers.GetCollection(ctx, document.CollectionID, userData.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !helpers.CanWriteDatabase(ctx, collection.DatabaseID, userData.KeyID) {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key doesn't have the ability to write to the database",
+		}
 	}
 
 	err = models.DeleteDocument(ctx, document)

@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 
-	"encore.dev/storage/sqldb"
 	"github.com/go-jet/jet/v2/postgres"
 	log "github.com/sirupsen/logrus"
 
@@ -85,7 +84,7 @@ func ValidateCollectionConstraint(ctx context.Context, collection *model.Collect
 	).LIMIT(1).Sql()
 
 	id := 0
-	err := sqldb.QueryRow(ctx, query, args...).Scan(&id)
+	err := db.QueryRowContext(ctx, query, args...).Scan(&id)
 	if err == nil && id != 0 {
 		log.Warning("Tried to save collection, a collection already exists for this name and database_id")
 		return false
@@ -111,8 +110,8 @@ func SaveCollection(ctx context.Context, collection *model.Collections) error {
 			table.Collections.CreatedAt,
 		).Sql()
 
-		err := sqldb.
-			QueryRow(ctx, query, args...).
+		err := db.
+			QueryRowContext(ctx, query, args...).
 			Scan(&collection.ID, &collection.UpdatedAt, &collection.CreatedAt)
 
 		if err != nil {
@@ -134,8 +133,8 @@ func SaveCollection(ctx context.Context, collection *model.Collections) error {
 		table.Collections.CreatedAt,
 	).Sql()
 
-	err := sqldb.
-		QueryRow(ctx, query, args...).
+	err := db.
+		QueryRowContext(ctx, query, args...).
 		Scan(&collection.ID, &collection.UpdatedAt, &collection.CreatedAt)
 
 	if err != nil {
@@ -155,7 +154,7 @@ func DeleteCollection(ctx context.Context, collection *model.Collections) error 
 		Sql()
 
 	deletedID := 0
-	err := sqldb.QueryRow(ctx, query, args...).Scan(&deletedID)
+	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
 	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete collection")
 		return err

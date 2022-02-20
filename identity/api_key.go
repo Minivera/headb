@@ -15,7 +15,19 @@ import (
 	"encore.app/identity/keys"
 	"encore.app/identity/models"
 	"encore.app/identity/models/generated/identity/public/model"
+	"encore.app/permissions"
+	model_permissions "encore.app/permissions/models/generated/permissions/public/model"
 )
+
+// GenerateApiKeyParams are the params to generate a new API key with a role and, optionally, limited
+// to a specific database.
+type GenerateApiKeyParams struct {
+	// The role to assign to this API Key, should be one of `write` or `read`
+	Role string
+
+	// An optional database ID to limit the api key to a specific database.
+	DatabaseID *int64
+}
 
 // GenerateApiKeyResponse is the result of the generation of an API key
 type GenerateApiKeyResponse struct {
@@ -26,11 +38,30 @@ type GenerateApiKeyResponse struct {
 	ApiKey string
 }
 
-// GenerateApiKey generates an API key for a specific user identified by it username. The user should
-// have signed in before they generate a key.
+// GenerateApiKey generates a new API key for the authenticated user given the selected role. Passing an optional
+// database ID allows the key to limit its operations to a specific database.
 //encore:api auth
-func GenerateApiKey(ctx context.Context) (*GenerateApiKeyResponse, error) {
+func GenerateApiKey(ctx context.Context, params *GenerateApiKeyParams) (*GenerateApiKeyResponse, error) {
 	userData := auth.Data().(*UserData)
+
+	can, err := permissions.Can(ctx, &permissions.CanParams{
+		KeyID:     userData.KeyID,
+		Operation: "admin",
+	})
+	if err != nil || !can.Allowed {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key cannot be used for admin operations",
+		}
+	}
+
+	if params.Role != model_permissions.Role_Write.String() && params.Role != model_permissions.Role_Read.String() {
+		log.Errorf("Tried to create a new API key with role %s", params.Role)
+		return nil, &errs.Error{
+			Code:    errs.InvalidArgument,
+			Message: "Role must be one of `write` or `read`",
+		}
+	}
 
 	user, err := models.GetUserByID(ctx, userData.ID)
 	if err != nil {
@@ -41,9 +72,20 @@ func GenerateApiKey(ctx context.Context) (*GenerateApiKeyResponse, error) {
 		}
 	}
 
-	apiKey, _, err := createKeyForUser(ctx, user)
+	apiKey, key, err := createKeyForUser(ctx, user)
 	if err != nil {
 		log.WithError(err).Error("Could not create an API key for the user")
+		return nil, err
+	}
+
+	_, err = permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+		UserID:     user.ID,
+		KeyID:      key.ID,
+		DatabaseID: params.DatabaseID,
+		Role:       params.Role,
+	})
+	if err != nil {
+		log.WithError(err).Error("Could not create permission set for api key")
 		return nil, err
 	}
 
@@ -121,6 +163,17 @@ type ListUserAPIKeysResponse struct {
 //encore:api auth
 func ListApiKeys(ctx context.Context) (*ListUserAPIKeysResponse, error) {
 	userData := auth.Data().(*UserData)
+
+	can, err := permissions.Can(ctx, &permissions.CanParams{
+		KeyID:     userData.KeyID,
+		Operation: "admin",
+	})
+	if err != nil || !can.Allowed {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key cannot be used for admin operations",
+		}
+	}
 
 	apiKeys, err := models.ListApiKeysForUser(ctx, userData.ID)
 	if err != nil {
@@ -233,6 +286,17 @@ type DeleteApiKeyResponse struct {
 //encore:api auth
 func DeleteApiKey(ctx context.Context, params *DeleteApiKeyParams) (*DeleteApiKeyResponse, error) {
 	userData := auth.Data().(*UserData)
+
+	can, err := permissions.Can(ctx, &permissions.CanParams{
+		KeyID:     userData.KeyID,
+		Operation: "admin",
+	})
+	if err != nil || !can.Allowed {
+		return nil, &errs.Error{
+			Code:    errs.PermissionDenied,
+			Message: "API key cannot be used for admin operations",
+		}
+	}
 
 	apiKey, err := helpers.GetApiKey(ctx, params.APIKeyID, userData.ID)
 	if err != nil {

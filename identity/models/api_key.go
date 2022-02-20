@@ -118,8 +118,8 @@ func SaveApiKey(ctx context.Context, key *model.APIKeys) error {
 			table.APIKeys.CreatedAt,
 		).Sql()
 
-	err := sqldb.
-		QueryRow(ctx, query, args...).
+	err := db.
+		QueryRowContext(ctx, query, args...).
 		Scan(&key.ID, &key.LastUsedAt, &key.UpdatedAt, &key.CreatedAt)
 
 	if err != nil {
@@ -139,7 +139,7 @@ func TransferApiKeys(ctx context.Context, oldUserID, newUserID int64) error {
 	).WHERE(table.APIKeys.UserID.EQ(postgres.Int64(oldUserID))).Sql()
 
 	transferredCount := 0
-	err := sqldb.QueryRow(ctx, query, args...).Scan(&transferredCount)
+	err := db.QueryRowContext(ctx, query, args...).Scan(&transferredCount)
 
 	if err != nil {
 		log.WithError(err).Errorf("Could not delete key")
@@ -164,7 +164,7 @@ func DeleteApiKey(ctx context.Context, key *model.APIKeys) error {
 		Sql()
 
 	deletedID := 0
-	err := sqldb.QueryRow(ctx, query, args...).Scan(&deletedID)
+	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
 
 	if err != nil || deletedID == 0 {
 		log.WithError(err).Errorf("Could not delete key")

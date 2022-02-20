@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	content_models "encore.app/content/models"
+	test_utils_content "encore.app/content/test_utils"
 	"encore.app/permissions/models"
 	"encore.app/permissions/models/generated/permissions/public/model"
 	"encore.app/permissions/models/generated/permissions/public/table"
@@ -49,15 +51,27 @@ func TestAddPermissionSet(t *testing.T) {
 		err      error
 	}
 
+	// Use models directly to avoid cyclic dependencies
+	// FIXME: Fix this
+	existingDatabase := content_models.NewDatabase("test", 1)
+	err := content_models.SaveDatabase(context.Background(), existingDatabase)
+	require.NoError(t, err)
+
 	existingPermissions := []*model.Permissions{
 		{
 			KeyID:      1,
-			DatabaseID: test_utils.Int64Pointer(1),
+			DatabaseID: test_utils.Int64Pointer(existingDatabase.ID),
 			Role:       "admin",
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		},
 	}
+
+	secondDatabase := content_models.NewDatabase("test2", 1)
+	err = content_models.SaveDatabase(context.Background(), secondDatabase)
+	require.NoError(t, err)
+
+	defer test_utils_content.Cleanup(context.Background())
 
 	tcs := []struct {
 		scenario string
@@ -68,14 +82,15 @@ func TestAddPermissionSet(t *testing.T) {
 			scenario: "Will create a permissions set with a database ID",
 			params: &AddPermissionSetParams{
 				KeyID:      1234,
-				DatabaseID: test_utils.Int64Pointer(1234),
+				UserID:     1,
+				DatabaseID: test_utils.Int64Pointer(secondDatabase.ID),
 				Role:       "read",
 			},
 			expected: expected{
 				response: &AddPermissionSetResponse{
 					PermissionSet: &model.Permissions{
 						KeyID:      1234,
-						DatabaseID: test_utils.Int64Pointer(1234),
+						DatabaseID: test_utils.Int64Pointer(secondDatabase.ID),
 						Role:       "read",
 					},
 				},
@@ -84,8 +99,9 @@ func TestAddPermissionSet(t *testing.T) {
 		{
 			scenario: "Will create a permissions set without a database ID",
 			params: &AddPermissionSetParams{
-				KeyID: 1234,
-				Role:  "read",
+				KeyID:  1234,
+				UserID: 1,
+				Role:   "read",
 			},
 			expected: expected{
 				response: &AddPermissionSetResponse{
@@ -99,8 +115,9 @@ func TestAddPermissionSet(t *testing.T) {
 		{
 			scenario: "Will fail when the role is invalid",
 			params: &AddPermissionSetParams{
-				KeyID: 1234,
-				Role:  "invalid",
+				KeyID:  1234,
+				UserID: 1,
+				Role:   "invalid",
 			},
 			expected: expected{
 				err: &errs.Error{
@@ -110,10 +127,26 @@ func TestAddPermissionSet(t *testing.T) {
 			},
 		},
 		{
+			scenario: "Will fail if the database cannot be found",
+			params: &AddPermissionSetParams{
+				KeyID:      1234,
+				UserID:     1,
+				DatabaseID: test_utils.Int64Pointer(-1),
+				Role:       "read",
+			},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.NotFound,
+					Message: "Database could not be found",
+				},
+			},
+		},
+		{
 			scenario: "Will fail if the set already exists",
 			params: &AddPermissionSetParams{
 				KeyID:      1,
-				DatabaseID: test_utils.Int64Pointer(1),
+				UserID:     1,
+				DatabaseID: test_utils.Int64Pointer(existingDatabase.ID),
 				Role:       "read",
 			},
 			expected: expected{

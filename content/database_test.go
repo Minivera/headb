@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	test_utils2 "encore.app/test_utils"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
@@ -18,6 +17,9 @@ import (
 	"encore.app/content/models/generated/content/public/table"
 	"encore.app/content/test_utils"
 	"encore.app/identity"
+	"encore.app/permissions"
+	test_utils_permissions "encore.app/permissions/test_utils"
+	test_utils2 "encore.app/test_utils"
 )
 
 func compareDatabases(t *testing.T, expected, actual []convert.DatabasePayload) {
@@ -90,12 +92,17 @@ func TestListDatabases(t *testing.T) {
 	tcs := []struct {
 		scenario          string
 		userData          *identity.UserData
+		userCan           *string
 		existingDatabases []*model.Databases
 		expected          expected
 	}{
 		{
-			scenario:          "Returns a list of databases owned by a user",
-			userData:          &identity.UserData{ID: 1},
+			scenario: "Returns a list of databases owned by a user",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan:           test_utils.StringPointer("admin"),
 			existingDatabases: validDatabases,
 			expected: expected{
 				response: &ListDatabasesResponse{
@@ -104,12 +111,30 @@ func TestListDatabases(t *testing.T) {
 			},
 		},
 		{
-			scenario:          "Returns empty when the user owns no databases",
-			userData:          &identity.UserData{ID: 2},
+			scenario: "Returns empty when the user owns no databases",
+			userData: &identity.UserData{
+				ID:    2,
+				KeyID: 1,
+			},
+			userCan:           test_utils.StringPointer("admin"),
 			existingDatabases: validDatabases,
 			expected: expected{
 				response: &ListDatabasesResponse{
 					Databases: []convert.DatabasePayload{},
+				},
+			},
+		},
+		{
+			scenario: "Fails if the key cannot view the databases",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			existingDatabases: validDatabases,
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key cannot be used for admin operations",
 				},
 			},
 		},
@@ -119,9 +144,18 @@ func TestListDatabases(t *testing.T) {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, tc.existingDatabases)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID: 1,
+					Role:  *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := ListDatabases(ctx)
 			if tc.expected.err != nil {
@@ -156,13 +190,18 @@ func TestGetDatabase(t *testing.T) {
 	tcs := []struct {
 		scenario          string
 		userData          *identity.UserData
+		userCan           *string
 		params            *GetDatabaseParams
 		existingDatabases []*model.Databases
 		expected          expected
 	}{
 		{
-			scenario:          "Returns a database by ID, owned by a user",
-			userData:          &identity.UserData{ID: 1},
+			scenario: "Returns a database by ID, owned by a user",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan:           test_utils.StringPointer("read"),
 			params:            &GetDatabaseParams{ID: validDatabases[0].ID},
 			existingDatabases: validDatabases,
 			expected: expected{
@@ -172,8 +211,12 @@ func TestGetDatabase(t *testing.T) {
 			},
 		},
 		{
-			scenario:          "Returns an error when the database is not found",
-			userData:          &identity.UserData{ID: 1},
+			scenario: "Returns an error when the database is not found",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan:           test_utils.StringPointer("read"),
 			params:            &GetDatabaseParams{ID: 3},
 			existingDatabases: validDatabases,
 			expected: expected{
@@ -184,8 +227,12 @@ func TestGetDatabase(t *testing.T) {
 			},
 		},
 		{
-			scenario:          "Returns an error when the user does not own the database",
-			userData:          &identity.UserData{ID: 2},
+			scenario: "Returns an error when the user does not own the database",
+			userData: &identity.UserData{
+				ID:    2,
+				KeyID: 1,
+			},
+			userCan:           test_utils.StringPointer("read"),
 			params:            &GetDatabaseParams{ID: validDatabases[0].ID},
 			existingDatabases: validDatabases,
 			expected: expected{
@@ -195,15 +242,39 @@ func TestGetDatabase(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Fails if the key cannot view the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params:            &GetDatabaseParams{ID: validDatabases[0].ID},
+			existingDatabases: validDatabases,
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to read the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, tc.existingDatabases)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID: 1,
+					Role:  *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := GetDatabase(ctx, tc.params)
 			if tc.expected.err != nil {
@@ -229,13 +300,18 @@ func TestCreateDatabase(t *testing.T) {
 	tcs := []struct {
 		scenario          string
 		userData          *identity.UserData
+		userCan           *string
 		existingDatabases []*model.Databases
 		params            *CreateDatabaseParams
 		expected          expected
 	}{
 		{
 			scenario: "Will create and return a database",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("admin"),
 			params: &CreateDatabaseParams{
 				Name: "test",
 			},
@@ -249,7 +325,11 @@ func TestCreateDatabase(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when a database already exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("admin"),
 			params: &CreateDatabaseParams{
 				Name: "test",
 			},
@@ -269,15 +349,40 @@ func TestCreateDatabase(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Fails if the key cannot act on the database",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params: &CreateDatabaseParams{
+				Name: "test",
+			},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key cannot be used for admin operations",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, tc.existingDatabases)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID: 1,
+					Role:  *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := CreateDatabase(ctx, tc.params)
 			if tc.expected.err != nil {
@@ -310,13 +415,18 @@ func TestUpdateDatabase(t *testing.T) {
 	tcs := []struct {
 		scenario          string
 		userData          *identity.UserData
+		userCan           *string
 		existingDatabases []*model.Databases
 		params            *UpdateDatabaseParams
 		expected          expected
 	}{
 		{
 			scenario: "Will update an existing database and return its data",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("admin"),
 			params: &UpdateDatabaseParams{
 				ID:   validDatabase.ID,
 				Name: "updated",
@@ -333,7 +443,11 @@ func TestUpdateDatabase(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when the database does not exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("admin"),
 			params: &UpdateDatabaseParams{
 				ID:   -1,
 				Name: "updated",
@@ -348,7 +462,11 @@ func TestUpdateDatabase(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when a database with this name already exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("admin"),
 			params: &UpdateDatabaseParams{
 				ID:   validDatabase.ID,
 				Name: validDatabase.Name,
@@ -361,15 +479,42 @@ func TestUpdateDatabase(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Will throw an error when the key cannot act on the databases",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params: &UpdateDatabaseParams{
+				ID:   validDatabase.ID,
+				Name: "updated",
+			},
+			existingDatabases: []*model.Databases{validDatabase},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to administrate the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, tc.existingDatabases)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID: 1,
+					Role:  *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := UpdateDatabase(ctx, tc.params)
 			if tc.expected.err != nil {
@@ -402,13 +547,18 @@ func TestDeleteDatabase(t *testing.T) {
 	tcs := []struct {
 		scenario          string
 		userData          *identity.UserData
+		userCan           *string
 		existingDatabases []*model.Databases
 		params            *DeleteDatabaseParams
 		expected          expected
 	}{
 		{
 			scenario: "Will delete an existing database and return its data",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("admin"),
 			params: &DeleteDatabaseParams{
 				ID: validDatabase.ID,
 			},
@@ -424,7 +574,11 @@ func TestDeleteDatabase(t *testing.T) {
 		},
 		{
 			scenario: "Will throw an error when the database does not exists",
-			userData: &identity.UserData{ID: 1},
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			userCan: test_utils.StringPointer("admin"),
 			params: &DeleteDatabaseParams{
 				ID: -1,
 			},
@@ -436,15 +590,41 @@ func TestDeleteDatabase(t *testing.T) {
 				},
 			},
 		},
+		{
+			scenario: "Will fail if the key cannot act on databases",
+			userData: &identity.UserData{
+				ID:    1,
+				KeyID: 1,
+			},
+			params: &DeleteDatabaseParams{
+				ID: validDatabase.ID,
+			},
+			existingDatabases: []*model.Databases{validDatabase},
+			expected: expected{
+				err: &errs.Error{
+					Code:    errs.PermissionDenied,
+					Message: "API key doesn't have the ability to administrate the database",
+				},
+			},
+		},
 	}
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
 			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
+			defer test_utils_permissions.Cleanup(ctx)
 
 			err := insertDatabases(ctx, tc.existingDatabases)
 			require.NoError(t, err)
+
+			if tc.userCan != nil {
+				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
+					KeyID: 1,
+					Role:  *tc.userCan,
+				})
+				require.NoError(t, err)
+			}
 
 			response, err := DeleteDatabase(ctx, tc.params)
 			if tc.expected.err != nil {
