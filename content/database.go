@@ -2,16 +2,9 @@ package content
 
 import (
 	"context"
-	"fmt"
-
-	"encore.app/content/helpers"
-	"encore.dev/beta/auth"
-	"encore.dev/beta/errs"
-	log "github.com/sirupsen/logrus"
 
 	"encore.app/content/convert"
-	"encore.app/content/models"
-	"encore.app/identity"
+	"encore.app/content/internal"
 )
 
 // ListDatabasesResponse is the list of databases for the current user
@@ -23,26 +16,13 @@ type ListDatabasesResponse struct {
 // ListDatabases lists all Databases created by the authenticated user.
 //encore:api auth
 func ListDatabases(ctx context.Context) (*ListDatabasesResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	if !helpers.CanAdmin(ctx, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key cannot be used for admin operations",
-		}
-	}
-
-	databases, err := models.ListDatabase(ctx, userData.ID)
+	databases, err := internal.ListDatabases(ctx)
 	if err != nil {
-		log.WithError(err).Warning("Could not fetch databases for the authenticated user")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not fetch databases",
-		}
+		return nil, err
 	}
 
 	return &ListDatabasesResponse{
-		Databases: convert.DatabaseModelsToPayloads(databases),
+		Databases: databases,
 	}, nil
 }
 
@@ -61,22 +41,13 @@ type GetDatabaseResponse struct {
 // GetDatabase Finds a database by ID
 //encore:api auth
 func GetDatabase(ctx context.Context, params *GetDatabaseParams) (*GetDatabaseResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	database, err := helpers.GetDatabase(ctx, params.ID, userData.ID)
+	database, err := internal.GetDatabase(ctx, params.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if !helpers.CanReadDatabase(ctx, database.ID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to read the database",
-		}
-	}
-
 	return &GetDatabaseResponse{
-		Database: convert.DatabaseModelToPayload(database),
+		Database: database,
 	}, nil
 }
 
@@ -98,39 +69,14 @@ type CreateDatabaseResponse struct {
 // CreateDatabase creates a database for the authenticated user.
 //encore:api auth
 func CreateDatabase(ctx context.Context, params *CreateDatabaseParams) (*CreateDatabaseResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	if !helpers.CanAdmin(ctx, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key cannot be used for admin operations",
-		}
-	}
-
-	database := models.NewDatabase(params.Name, userData.ID)
-	if !models.ValidateDatabaseConstraint(ctx, database) {
-		log.WithFields(map[string]interface{}{
-			"name":    params.Name,
-			"user_id": userData.ID,
-		}).Warning("Could not validate the constraints for the database, a database already exists.")
-		return nil, &errs.Error{
-			Code:    errs.AlreadyExists,
-			Message: fmt.Sprintf("A database with name `%s` already exists", database.Name),
-		}
-	}
-
-	err := models.SaveDatabase(ctx, database)
+	database, err := internal.CreateDatabase(ctx, params.Name)
 	if err != nil {
-		log.WithError(err).Error("Could not save databases")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not save database",
-		}
+		return nil, err
 	}
 
 	return &CreateDatabaseResponse{
 		Message:  "Database created successfully.",
-		Database: convert.DatabaseModelToPayload(database),
+		Database: database,
 	}, nil
 }
 
@@ -155,44 +101,14 @@ type UpdateDatabaseResponse struct {
 // UpdateDatabase updates a database by ID for the authenticated user
 //encore:api auth
 func UpdateDatabase(ctx context.Context, params *UpdateDatabaseParams) (*UpdateDatabaseResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	database, err := helpers.GetDatabase(ctx, params.ID, userData.ID)
+	database, err := internal.UpdateDatabase(ctx, params.ID, params.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	if !helpers.CanAdminDatabase(ctx, database.ID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to administrate the database",
-		}
-	}
-
-	database.Name = params.Name
-	if !models.ValidateDatabaseConstraint(ctx, database) {
-		log.WithFields(map[string]interface{}{
-			"name":    params.Name,
-			"user_id": userData.ID,
-		}).Warning("Could not validate the constraints for the database, a database already exists.")
-		return nil, &errs.Error{
-			Code:    errs.AlreadyExists,
-			Message: fmt.Sprintf("A database with name `%s` already exists", database.Name),
-		}
-	}
-
-	err = models.SaveDatabase(ctx, database)
-	if err != nil {
-		log.WithError(err).Error("Could not save database")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not save Database",
-		}
-	}
-
 	return &UpdateDatabaseResponse{
 		Message:  "Database updated successfully.",
-		Database: convert.DatabaseModelToPayload(database),
+		Database: database,
 	}, nil
 }
 
@@ -214,31 +130,13 @@ type DeleteDatabaseResponse struct {
 // DeleteDatabase deletes a database by ID for the authenticated user
 //encore:api auth
 func DeleteDatabase(ctx context.Context, params *DeleteDatabaseParams) (*DeleteDatabaseResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	database, err := helpers.GetDatabase(ctx, params.ID, userData.ID)
+	database, err := internal.DeleteDatabase(ctx, params.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if !helpers.CanAdminDatabase(ctx, database.ID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to administrate the database",
-		}
-	}
-
-	err = models.DeleteDatabase(ctx, database)
-	if err != nil {
-		log.WithError(err).Error("Could not delete database")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not delete database",
-		}
-	}
-
 	return &DeleteDatabaseResponse{
 		Message:  "Database deleted successfully.",
-		Database: convert.DatabaseModelToPayload(database),
+		Database: database,
 	}, nil
 }

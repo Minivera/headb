@@ -2,14 +2,8 @@ package permissions
 
 import (
 	"context"
-	"errors"
 
-	"encore.dev/beta/errs"
-	"github.com/go-jet/jet/v2/qrm"
-	log "github.com/sirupsen/logrus"
-
-	content_models "encore.app/content/models"
-	"encore.app/permissions/models"
+	"encore.app/permissions/internal"
 	"encore.app/permissions/models/generated/permissions/public/model"
 )
 
@@ -41,40 +35,9 @@ type AddPermissionSetResponse struct {
 // permissions needs to be added.
 //encore:api private
 func AddPermissionSet(ctx context.Context, params *AddPermissionSetParams) (*AddPermissionSetResponse, error) {
-	role := model.Role("")
-	err := role.Scan(params.Role)
+	permissionSet, err := internal.AddPermissionSet(ctx, params.KeyID, params.UserID, params.DatabaseID, params.Role)
 	if err != nil {
-		log.WithError(err).Warning("Selected role is not valid")
-		return nil, &errs.Error{
-			Code:    errs.InvalidArgument,
-			Message: "Selected role is not valid, must be one of `admin`, `write`, or `read`",
-		}
-	}
-
-	if params.DatabaseID != nil {
-		// Get the database if the key was created for a specific database
-		// use the models directly here to avoid cycling dependencies.
-		_, err := content_models.GetDatabaseByID(ctx, *params.DatabaseID, params.UserID)
-		if err != nil {
-			return nil, &errs.Error{
-				Code:    errs.NotFound,
-				Message: "Database could not be found",
-			}
-		}
-	}
-
-	permissionSet := models.NewPermissionSet(params.KeyID, params.DatabaseID, role)
-	err = models.CreatePermissionSet(ctx, permissionSet)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"key_id":      params.KeyID,
-			"database_id": params.DatabaseID,
-			"role":        role,
-		}).WithError(err).Error("Could not save permission set")
-		return nil, &errs.Error{
-			Code:    errs.AlreadyExists,
-			Message: "Could not save permission set, set probably already exists",
-		}
+		return nil, err
 	}
 
 	return &AddPermissionSetResponse{
@@ -97,28 +60,9 @@ type RemovePermissionSetResponse struct {
 // RemovePermissionSet removes a permission set using an ID.
 //encore:api private
 func RemovePermissionSet(ctx context.Context, params *RemovePermissionSetParams) (*RemovePermissionSetResponse, error) {
-	permissionSet, err := models.GetPermissionByID(ctx, params.ID)
-	if errors.Is(err, qrm.ErrNoRows) {
-		log.WithError(err).Warning("Could not find permission by the given ID")
-		return nil, &errs.Error{
-			Code:    errs.NotFound,
-			Message: "Could not find permission set",
-		}
-	} else if err != nil {
-		log.WithError(err).Error("Could not find permission by the given ID")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find permission set",
-		}
-	}
-
-	err = models.DeletePermissionSet(ctx, permissionSet)
+	permissionSet, err := internal.RemovePermissionSet(ctx, params.ID)
 	if err != nil {
-		log.WithError(err).Error("Could not delete permission set")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not delete permission set",
-		}
+		return nil, err
 	}
 
 	return &RemovePermissionSetResponse{
@@ -151,40 +95,9 @@ type CanResponse struct {
 // a database ID.
 //encore:api private
 func Can(ctx context.Context, params *CanParams) (*CanResponse, error) {
-	operation := model.Role("")
-	err := operation.Scan(params.Operation)
+	can, err := internal.Can(ctx, params.KeyID, params.DatabaseID, params.Operation)
 	if err != nil {
-		log.WithError(err).Warning("Given operation is not valid")
-		return nil, &errs.Error{
-			Code:    errs.InvalidArgument,
-			Message: "Selected role is not valid, must be one of `admin`, `write`, or `read`",
-		}
-	}
-
-	permissionSet, err := models.GetPermission(ctx, params.KeyID, params.DatabaseID)
-	if errors.Is(err, qrm.ErrNoRows) {
-		log.WithError(err).Warning("Could not find permission, returning unallowed")
-		return &CanResponse{
-			Allowed: false,
-		}, nil
-	} else if err != nil {
-		log.WithError(err).Error("Could not find permission")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not find permission set",
-		}
-	}
-
-	can := false
-	switch operation {
-	case model.Role_Admin:
-		can = permissionSet.Role == model.Role_Admin
-	case model.Role_Write:
-		can = permissionSet.Role == model.Role_Admin || permissionSet.Role == model.Role_Write
-	case model.Role_Read:
-		can = permissionSet.Role == model.Role_Admin ||
-			permissionSet.Role == model.Role_Write ||
-			permissionSet.Role == model.Role_Read
+		return nil, err
 	}
 
 	return &CanResponse{

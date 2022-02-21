@@ -2,16 +2,11 @@ package content
 
 import (
 	"context"
-	"fmt"
 
-	"encore.app/content/helpers"
-	"encore.dev/beta/auth"
-	"encore.dev/beta/errs"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/content/convert"
-	"encore.app/content/models"
-	"encore.app/identity"
+	"encore.app/content/internal"
 )
 
 // ListCollectionsParams is the parameters for listing the collections of a database
@@ -30,32 +25,14 @@ type ListCollectionsResponse struct {
 // database.
 //encore:api auth
 func ListCollections(ctx context.Context, params *ListCollectionsParams) (*ListCollectionsResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	database, err := helpers.GetDatabase(ctx, params.DatabaseID, userData.ID)
+	collections, err := internal.ListCollections(ctx, params.DatabaseID)
 	if err != nil {
-		log.WithError(err).Error("Could not find database when listing collections")
+		log.WithError(err).Warning("Could not fetch collections for this database")
 		return nil, err
 	}
 
-	if !helpers.CanReadDatabase(ctx, database.ID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to read the database",
-		}
-	}
-
-	collections, err := models.ListCollections(ctx, database.ID)
-	if err != nil {
-		log.WithError(err).Warning("Could not fetch collections for this database")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not fetch collections",
-		}
-	}
-
 	return &ListCollectionsResponse{
-		Collections: convert.CollectionModelsToPayloads(collections),
+		Collections: collections,
 	}, nil
 }
 
@@ -74,22 +51,13 @@ type GetCollectionResponse struct {
 // GetCollection Finds a collection by ID
 //encore:api auth
 func GetCollection(ctx context.Context, params *GetCollectionParams) (*GetCollectionResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	collection, err := helpers.GetCollection(ctx, params.ID, userData.ID)
+	collection, err := internal.GetCollection(ctx, params.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if !helpers.CanReadDatabase(ctx, collection.DatabaseID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to read the database",
-		}
-	}
-
 	return &GetCollectionResponse{
-		Collection: convert.CollectionModelToPayload(collection),
+		Collection: collection,
 	}, nil
 }
 
@@ -114,45 +82,14 @@ type CreateCollectionResponse struct {
 // CreateCollection creates a collection for the given database if owned by the authenticated user.
 //encore:api auth
 func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*CreateCollectionResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	database, err := helpers.GetDatabase(ctx, params.DatabaseID, userData.ID)
+	collection, err := internal.CreateCollection(ctx, params.DatabaseID, params.Name)
 	if err != nil {
-		log.WithError(err).Error("Could not find database when creating a new collection")
 		return nil, err
-	}
-
-	if !helpers.CanWriteDatabase(ctx, database.ID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to write to the database",
-		}
-	}
-
-	collection := models.NewCollection(params.Name, database.ID)
-	if !models.ValidateCollectionConstraint(ctx, collection) {
-		log.WithFields(map[string]interface{}{
-			"name":        params.Name,
-			"database_id": database.ID,
-		}).Warning("Could not validate the constraints for collection, a collection already exists.")
-		return nil, &errs.Error{
-			Code:    errs.AlreadyExists,
-			Message: fmt.Sprintf("A collection with name `%s` already exists in this database", collection.Name),
-		}
-	}
-
-	err = models.SaveCollection(ctx, collection)
-	if err != nil {
-		log.WithError(err).Error("Could not save collections for this database")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not save collection",
-		}
 	}
 
 	return &CreateCollectionResponse{
 		Message:    "Collection created successfully.",
-		Collection: convert.CollectionModelToPayload(collection),
+		Collection: collection,
 	}, nil
 }
 
@@ -177,44 +114,14 @@ type UpdateCollectionResponse struct {
 // UpdateCollection updates a collection by ID for the authenticated user
 //encore:api auth
 func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*UpdateCollectionResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	collection, err := helpers.GetCollection(ctx, params.ID, userData.ID)
+	collection, err := internal.UpdateCollection(ctx, params.ID, params.Name)
 	if err != nil {
 		return nil, err
 	}
 
-	if !helpers.CanWriteDatabase(ctx, collection.DatabaseID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to write to the database",
-		}
-	}
-
-	collection.Name = params.Name
-	if !models.ValidateCollectionConstraint(ctx, collection) {
-		log.WithFields(map[string]interface{}{
-			"name":        params.Name,
-			"database_id": collection.DatabaseID,
-		}).Warning("Could not validate the constraints for collection, a collection already exists.")
-		return nil, &errs.Error{
-			Code:    errs.AlreadyExists,
-			Message: fmt.Sprintf("A collection with name `%s` already exists in this database", collection.Name),
-		}
-	}
-
-	err = models.SaveCollection(ctx, collection)
-	if err != nil {
-		log.WithError(err).Error("Could not save collection")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not save collection",
-		}
-	}
-
 	return &UpdateCollectionResponse{
 		Message:    "Collection updated successfully.",
-		Collection: convert.CollectionModelToPayload(collection),
+		Collection: collection,
 	}, nil
 }
 
@@ -236,31 +143,13 @@ type DeleteCollectionResponse struct {
 // DeleteCollection deletes a collection by ID for the authenticated user
 //encore:api auth
 func DeleteCollection(ctx context.Context, params *DeleteCollectionParams) (*DeleteCollectionResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	collection, err := helpers.GetCollection(ctx, params.ID, userData.ID)
+	collection, err := internal.DeleteCollection(ctx, params.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if !helpers.CanWriteDatabase(ctx, collection.DatabaseID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to write to the database",
-		}
-	}
-
-	err = models.DeleteCollection(ctx, collection)
-	if err != nil {
-		log.WithError(err).Error("Could not delete collection")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not delete collection",
-		}
-	}
-
 	return &DeleteCollectionResponse{
 		Message:    "Collection deleted successfully.",
-		Collection: convert.CollectionModelToPayload(collection),
+		Collection: collection,
 	}, nil
 }

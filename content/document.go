@@ -4,14 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"encore.app/content/helpers"
-	"encore.dev/beta/auth"
-	"encore.dev/beta/errs"
-	log "github.com/sirupsen/logrus"
-
 	"encore.app/content/convert"
-	"encore.app/content/models"
-	"encore.app/identity"
+	"encore.app/content/internal"
 )
 
 // ListDocumentsParams is the parameters for listing the documents of a collection
@@ -29,40 +23,13 @@ type ListDocumentsResponse struct {
 // ListDocuments lists all documents created by the authenticated user for a given collection
 //encore:api auth
 func ListDocuments(ctx context.Context, params *ListDocumentsParams) (*ListDocumentsResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	collection, err := helpers.GetCollection(ctx, params.CollectionID, userData.ID)
+	documents, err := internal.ListDocuments(ctx, params.CollectionID)
 	if err != nil {
 		return nil, err
 	}
 
-	if !helpers.CanReadDatabase(ctx, collection.DatabaseID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to read the database",
-		}
-	}
-
-	documents, err := models.ListDocuments(ctx, collection.ID)
-	if err != nil {
-		log.WithError(err).Error("Could not fetch documents for collection")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not fetch documents",
-		}
-	}
-
-	payload, err := convert.DocumentModelsToPayloads(documents)
-	if err != nil {
-		log.WithError(err).Error("Could not convert documents to API safe version")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not convert documents for API",
-		}
-	}
-
 	return &ListDocumentsResponse{
-		Documents: payload,
+		Documents: documents,
 	}, nil
 }
 
@@ -81,36 +48,13 @@ type GetDocumentResponse struct {
 // GetDocument finds a document by ID
 //encore:api auth
 func GetDocument(ctx context.Context, params *GetDocumentParams) (*GetDocumentResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	document, err := helpers.GetDocument(ctx, params.ID, userData.ID)
+	document, err := internal.GetDocument(ctx, params.ID)
 	if err != nil {
 		return nil, err
-	}
-
-	collection, err := helpers.GetCollection(ctx, document.CollectionID, userData.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	if !helpers.CanReadDatabase(ctx, collection.DatabaseID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to read the database",
-		}
-	}
-
-	payload, err := convert.DocumentModelToPayload(document)
-	if err != nil {
-		log.WithError(err).Error("Could not convert documents to API safe version")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not convert document for API",
-		}
 	}
 
 	return &GetDocumentResponse{
-		Document: payload,
+		Document: document,
 	}, nil
 }
 
@@ -135,52 +79,14 @@ type CreateDocumentResponse struct {
 // CreateDocument creates a document for the authenticated user
 //encore:api auth
 func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateDocumentResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	collection, err := helpers.GetCollection(ctx, params.CollectionID, userData.ID)
+	document, err := internal.CreateDocument(ctx, params.CollectionID, params.Content)
 	if err != nil {
 		return nil, err
 	}
 
-	if !helpers.CanWriteDatabase(ctx, collection.DatabaseID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to write to the database",
-		}
-	}
-
-	_, err = params.Content.MarshalJSON()
-	if string(params.Content) == "null" || err != nil {
-		log.WithError(err).Warning("Could not validate JSON on document request")
-		return nil, &errs.Error{
-			Code:    errs.InvalidArgument,
-			Message: "Received JSON string for content was not valid",
-		}
-	}
-
-	document := models.NewDocument(string(params.Content), collection.ID)
-
-	err = models.SaveDocument(ctx, document)
-	if err != nil {
-		log.WithError(err).Error("Could not save document")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not save document",
-		}
-	}
-
-	payload, err := convert.DocumentModelToPayload(document)
-	if err != nil {
-		log.WithError(err).Error("Could not convert document to API safe version")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not convert document for API",
-		}
-	}
-
 	return &CreateDocumentResponse{
 		Message:  "Document created successfully.",
-		Document: payload,
+		Document: document,
 	}, nil
 }
 
@@ -205,57 +111,14 @@ type UpdateDocumentResponse struct {
 // UpdateDocument updates a document by ID for the authenticated user
 //encore:api auth
 func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateDocumentResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	document, err := helpers.GetDocument(ctx, params.ID, userData.ID)
+	document, err := internal.UpdateDocument(ctx, params.ID, params.Content)
 	if err != nil {
 		return nil, err
-	}
-
-	collection, err := helpers.GetCollection(ctx, document.CollectionID, userData.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	if !helpers.CanWriteDatabase(ctx, collection.DatabaseID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to write to the database",
-		}
-	}
-
-	_, err = params.Content.MarshalJSON()
-	if string(params.Content) == "null" || err != nil {
-		log.WithError(err).Warning("Could not validate JSON on document request")
-		return nil, &errs.Error{
-			Code:    errs.InvalidArgument,
-			Message: "Received JSON string for content was not valid",
-		}
-	}
-
-	document.Content = string(params.Content)
-
-	err = models.SaveDocument(ctx, document)
-	if err != nil {
-		log.WithError(err).Error("Could not save document")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not save document",
-		}
-	}
-
-	payload, err := convert.DocumentModelToPayload(document)
-	if err != nil {
-		log.WithError(err).Error("Could not convert document to API safe version")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not convert document for API",
-		}
 	}
 
 	return &UpdateDocumentResponse{
 		Message:  "Document updated successfully.",
-		Document: payload,
+		Document: document,
 	}, nil
 }
 
@@ -277,44 +140,13 @@ type DeleteDocumentResponse struct {
 // DeleteDocument deletes a document by ID for the authenticated user
 //encore:api auth
 func DeleteDocument(ctx context.Context, params *DeleteDocumentParams) (*DeleteDocumentResponse, error) {
-	userData := auth.Data().(*identity.UserData)
-
-	document, err := helpers.GetDocument(ctx, params.ID, userData.ID)
+	document, err := internal.DeleteDocument(ctx, params.ID)
 	if err != nil {
 		return nil, err
-	}
-
-	collection, err := helpers.GetCollection(ctx, document.CollectionID, userData.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	if !helpers.CanWriteDatabase(ctx, collection.DatabaseID, userData.KeyID) {
-		return nil, &errs.Error{
-			Code:    errs.PermissionDenied,
-			Message: "API key doesn't have the ability to write to the database",
-		}
-	}
-
-	err = models.DeleteDocument(ctx, document)
-	if err != nil {
-		log.WithError(err).Error("Could not delete document")
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not delete document",
-		}
-	}
-
-	payload, err := convert.DocumentModelToPayload(document)
-	if err != nil {
-		return nil, &errs.Error{
-			Code:    errs.Internal,
-			Message: "Could not convert document for API",
-		}
 	}
 
 	return &DeleteDocumentResponse{
 		Message:  "Document deleted successfully.",
-		Document: payload,
+		Document: document,
 	}, nil
 }
