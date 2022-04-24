@@ -4,13 +4,15 @@ import (
 	"encoding/json"
 	"time"
 
+	"encore.dev/types/uuid"
+
 	"encore.app/content/models/generated/content/public/model"
 )
 
 // DocumentPayload is an API safe representation of a document.
 type DocumentPayload struct {
 	// The document unique identifier
-	ID int64
+	ID uuid.UUID
 
 	// The document content
 	Content   json.RawMessage

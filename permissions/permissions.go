@@ -3,6 +3,8 @@ package permissions
 import (
 	"context"
 
+	"encore.dev/types/uuid"
+
 	"encore.app/permissions/internal"
 	"encore.app/permissions/models/generated/permissions/public/model"
 )
@@ -11,14 +13,14 @@ import (
 // permissions on a key ID and optionally a database ID.
 type AddPermissionSetParams struct {
 	// The unique ID of the key to assign this permission to
-	KeyID int64
+	KeyID uuid.UUID
 
 	// The unique ID of the user assigned to this key and database. To validate
 	// ownership when creating.
-	UserID int64
+	UserID uuid.UUID
 
 	// The unique ID of the database to assign this permission to, if any
-	DatabaseID *int64
+	DatabaseID *uuid.UUID
 
 	// The role to assign to this permission set
 	Role string
@@ -48,7 +50,7 @@ func AddPermissionSet(ctx context.Context, params *AddPermissionSetParams) (*Add
 // RemovePermissionSetParams is the params to remove a new permissions
 type RemovePermissionSetParams struct {
 	// The unique ID of the permission set to delete
-	ID int64
+	ID uuid.UUID
 }
 
 // RemovePermissionSetResponse is the response of the remove permission set operation
@@ -74,10 +76,10 @@ func RemovePermissionSet(ctx context.Context, params *RemovePermissionSetParams)
 // no ID is provided) given the operation.
 type CanParams struct {
 	// The unique ID of the key to assign this permission to
-	KeyID int64
+	KeyID uuid.UUID
 
 	// The unique ID of the database to assign this permission to, if any
-	DatabaseID *int64
+	DatabaseID *uuid.UUID
 
 	// The operation to validate, should be a role
 	Operation string

@@ -8,13 +8,14 @@
 package model
 
 import (
+	"encore.dev/types/uuid"
 	"time"
 )
 
 type Collections struct {
-	ID         int64 `sql:"primary_key"`
+	ID         uuid.UUID `sql:"primary_key"`
 	Name       string
-	DatabaseID int64
+	DatabaseID uuid.UUID
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 }

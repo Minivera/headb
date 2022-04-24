@@ -3,9 +3,9 @@ package keys
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"strconv"
 	"time"
 
+	"encore.dev/types/uuid"
 	"github.com/o1egl/paseto"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -41,7 +41,7 @@ func GenerateSecureApiKey(key string) (string, error) {
 
 // EncryptToPaseto will merge the given API key string with a database integer ID using
 // a paseto web token and return the encrypted key.
-func EncryptToPaseto(key string, keyID int64, encryptionSecret string) (string, error) {
+func EncryptToPaseto(key string, keyID uuid.UUID, encryptionSecret string) (string, error) {
 	symmetricKey := []byte(encryptionSecret)
 	now := time.Now()
 
@@ -52,7 +52,7 @@ func EncryptToPaseto(key string, keyID int64, encryptionSecret string) (string, 
 	}
 
 	jsonToken.Set("key_value", key)
-	jsonToken.Set("key_id", strconv.FormatInt(keyID, 10))
+	jsonToken.Set("key_id", keyID.String())
 
 	token, err := paseto.NewV2().Encrypt(symmetricKey, jsonToken, "")
 	if err != nil {
@@ -64,17 +64,17 @@ func EncryptToPaseto(key string, keyID int64, encryptionSecret string) (string, 
 
 // ExtractIDAndValue extracts the database ID and API key value from
 // an encoded API key string through paseto.
-func ExtractIDAndValue(mergedKey string, encryptionSecret string) (string, int64, error) {
+func ExtractIDAndValue(mergedKey string, encryptionSecret string) (string, uuid.UUID, error) {
 	var newJsonToken paseto.JSONToken
 	var newFooter string
 	err := paseto.NewV2().Decrypt(mergedKey, []byte(encryptionSecret), &newJsonToken, &newFooter)
 	if err != nil {
-		return "", 0, err
+		return "", uuid.Nil, err
 	}
 
-	keyID, err := strconv.ParseInt(newJsonToken.Get("key_id"), 10, 64)
+	keyID, err := uuid.FromString(newJsonToken.Get("key_id"))
 	if err != nil {
-		return "", 0, err
+		return "", uuid.Nil, err
 	}
 
 	return newJsonToken.Get("key_value"), keyID, nil

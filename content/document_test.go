@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"testing"
 	"time"
 
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
+	"encore.dev/types/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,24 +75,33 @@ func TestListDocuments(t *testing.T) {
 		err      error
 	}
 
+	newUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	secondUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	badUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
 	existingDatabase := &model.Databases{
-		ID:        1,
+		ID:        newUUID,
 		Name:      "test",
-		UserID:    1,
+		UserID:    newUUID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	validCollections := []*model.Collections{
 		{
-			ID:         2,
+			ID:         newUUID,
 			DatabaseID: existingDatabase.ID,
 			Name:       "test",
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		},
 		{
-			ID:         3,
+			ID:         secondUUID,
 			DatabaseID: existingDatabase.ID,
 			Name:       "test2",
 			CreatedAt:  now,
@@ -101,14 +110,14 @@ func TestListDocuments(t *testing.T) {
 	}
 	validDocuments := []*model.Documents{
 		{
-			ID:           3,
+			ID:           newUUID,
 			CollectionID: validCollections[0].ID,
 			Content:      `{"foo": "bar"}`,
 			CreatedAt:    now,
 			UpdatedAt:    now,
 		},
 		{
-			ID:           4,
+			ID:           secondUUID,
 			CollectionID: validCollections[0].ID,
 			Content:      `{"foo": "bar2"}`,
 			CreatedAt:    now,
@@ -129,8 +138,8 @@ func TestListDocuments(t *testing.T) {
 		{
 			scenario: "Returns a list of documents owned by a user",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("read"),
 			params: &ListDocumentsParams{
@@ -146,8 +155,8 @@ func TestListDocuments(t *testing.T) {
 		{
 			scenario: "Returns empty when the collection owns no documents",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("read"),
 			params: &ListDocumentsParams{
@@ -155,7 +164,7 @@ func TestListDocuments(t *testing.T) {
 			},
 			existingDocuments: []*model.Documents{
 				{
-					ID:           3,
+					ID:           badUUID,
 					CollectionID: validCollections[1].ID,
 					Content:      `{"foo": "bar"}`,
 					CreatedAt:    now,
@@ -171,12 +180,12 @@ func TestListDocuments(t *testing.T) {
 		{
 			scenario: "Throws an error when the collection does not exists",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("read"),
 			params: &ListDocumentsParams{
-				CollectionID: -1,
+				CollectionID: badUUID,
 			},
 			expected: expected{
 				err: &errs.Error{
@@ -188,8 +197,8 @@ func TestListDocuments(t *testing.T) {
 		{
 			scenario: "Fails when the user cannot read the database",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			params: &ListDocumentsParams{
 				CollectionID: validCollections[0].ID,
@@ -206,7 +215,7 @@ func TestListDocuments(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -221,9 +230,9 @@ func TestListDocuments(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID:      1,
+					KeyID:      newUUID,
 					DatabaseID: &existingDatabase.ID,
-					UserID:     1,
+					UserID:     newUUID,
 					Role:       *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -249,16 +258,22 @@ func TestGetDocument(t *testing.T) {
 		err      error
 	}
 
+	newUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	badUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
 	existingDatabase := &model.Databases{
-		ID:        1,
+		ID:        newUUID,
 		Name:      "test",
-		UserID:    1,
+		UserID:    newUUID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	validCollection := &model.Collections{
-		ID:         2,
+		ID:         newUUID,
 		DatabaseID: existingDatabase.ID,
 		Name:       "test",
 		CreatedAt:  now,
@@ -266,8 +281,8 @@ func TestGetDocument(t *testing.T) {
 	}
 	validDocuments := []*model.Documents{
 		{
-			ID:           3,
-			CollectionID: 2,
+			ID:           newUUID,
+			CollectionID: newUUID,
 			Content:      `{"foo": "bar"}`,
 			CreatedAt:    now,
 			UpdatedAt:    now,
@@ -287,8 +302,8 @@ func TestGetDocument(t *testing.T) {
 		{
 			scenario: "Returns a document by ID, owned by a user",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan:           test_utils.StringPointer("read"),
 			params:            &GetDocumentParams{ID: validDocuments[0].ID},
@@ -302,11 +317,11 @@ func TestGetDocument(t *testing.T) {
 		{
 			scenario: "Returns an error when the document is not found",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan:           test_utils.StringPointer("read"),
-			params:            &GetDocumentParams{ID: -1},
+			params:            &GetDocumentParams{ID: badUUID},
 			existingDocuments: validDocuments,
 			expected: expected{
 				err: &errs.Error{
@@ -318,8 +333,8 @@ func TestGetDocument(t *testing.T) {
 		{
 			scenario: "Returns an error when the user does not own the document",
 			userData: &identity.UserData{
-				ID:    -1,
-				KeyID: 1,
+				ID:    badUUID,
+				KeyID: newUUID,
 			},
 			userCan:           test_utils.StringPointer("read"),
 			params:            &GetDocumentParams{ID: validDocuments[0].ID},
@@ -334,8 +349,8 @@ func TestGetDocument(t *testing.T) {
 		{
 			scenario: "Returns an error when the key cannot access the database",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			params:            &GetDocumentParams{ID: validDocuments[0].ID},
 			existingDocuments: validDocuments,
@@ -350,7 +365,7 @@ func TestGetDocument(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -365,9 +380,9 @@ func TestGetDocument(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID:      1,
+					KeyID:      newUUID,
 					DatabaseID: &existingDatabase.ID,
-					UserID:     1,
+					UserID:     newUUID,
 					Role:       *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -394,16 +409,22 @@ func TestCreateDocument(t *testing.T) {
 		err      error
 	}
 
+	newUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	badUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
 	existingDatabase := &model.Databases{
-		ID:        1,
+		ID:        newUUID,
 		Name:      "test",
-		UserID:    1,
+		UserID:    newUUID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	validCollection := &model.Collections{
-		ID:         2,
+		ID:         newUUID,
 		DatabaseID: existingDatabase.ID,
 		Name:       "test",
 		CreatedAt:  now,
@@ -420,8 +441,8 @@ func TestCreateDocument(t *testing.T) {
 		{
 			scenario: "Will create and return a document",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &CreateDocumentParams{
@@ -439,12 +460,12 @@ func TestCreateDocument(t *testing.T) {
 		{
 			scenario: "Will throw an error when the collection does not exists",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &CreateDocumentParams{
-				CollectionID: -1,
+				CollectionID: badUUID,
 				Content:      json.RawMessage(`{"foo": "bar"}`),
 			},
 			expected: expected{
@@ -457,8 +478,8 @@ func TestCreateDocument(t *testing.T) {
 		{
 			scenario: "Will throw an error when the content is not JSON",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &CreateDocumentParams{
@@ -475,8 +496,8 @@ func TestCreateDocument(t *testing.T) {
 		{
 			scenario: "Will return an error when the key cannot write to the database",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			params: &CreateDocumentParams{
 				CollectionID: validCollection.ID,
@@ -493,7 +514,7 @@ func TestCreateDocument(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -505,9 +526,9 @@ func TestCreateDocument(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID:      1,
+					KeyID:      newUUID,
 					DatabaseID: &existingDatabase.ID,
-					UserID:     1,
+					UserID:     newUUID,
 					Role:       *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -535,16 +556,22 @@ func TestUpdateDocument(t *testing.T) {
 		err      error
 	}
 
+	newUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	badUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
 	existingDatabase := &model.Databases{
-		ID:        1,
+		ID:        newUUID,
 		Name:      "test",
-		UserID:    1,
+		UserID:    newUUID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	validCollection := &model.Collections{
-		ID:         2,
+		ID:         newUUID,
 		DatabaseID: existingDatabase.ID,
 		Name:       "test",
 		CreatedAt:  now,
@@ -552,7 +579,7 @@ func TestUpdateDocument(t *testing.T) {
 	}
 
 	validDocument := &model.Documents{
-		ID:           2,
+		ID:           newUUID,
 		CollectionID: validCollection.ID,
 		Content:      `{"foo": "bar"}`,
 		CreatedAt:    now,
@@ -570,8 +597,8 @@ func TestUpdateDocument(t *testing.T) {
 		{
 			scenario: "Will update an existing document and return its data",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &UpdateDocumentParams{
@@ -591,12 +618,12 @@ func TestUpdateDocument(t *testing.T) {
 		{
 			scenario: "Will throw an error when the document does not exists",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &UpdateDocumentParams{
-				ID:      -1,
+				ID:      badUUID,
 				Content: json.RawMessage(`{"foo": "updated"}`),
 			},
 			existingDocuments: []*model.Documents{validDocument},
@@ -610,8 +637,8 @@ func TestUpdateDocument(t *testing.T) {
 		{
 			scenario: "Will throw an error when the JSON is not valid",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &UpdateDocumentParams{
@@ -629,8 +656,8 @@ func TestUpdateDocument(t *testing.T) {
 		{
 			scenario: "Will return an error when the key cannot write to the database",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			params: &UpdateDocumentParams{
 				ID:      validDocument.ID,
@@ -648,7 +675,7 @@ func TestUpdateDocument(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -663,9 +690,9 @@ func TestUpdateDocument(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID:      1,
+					KeyID:      newUUID,
 					DatabaseID: &existingDatabase.ID,
-					UserID:     1,
+					UserID:     newUUID,
 					Role:       *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -691,16 +718,22 @@ func TestDeleteDocument(t *testing.T) {
 		err      error
 	}
 
+	newUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	badUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
 	existingDatabase := &model.Databases{
-		ID:        1,
+		ID:        newUUID,
 		Name:      "test",
-		UserID:    1,
+		UserID:    newUUID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	validCollection := &model.Collections{
-		ID:         2,
+		ID:         newUUID,
 		DatabaseID: existingDatabase.ID,
 		Name:       "test",
 		CreatedAt:  now,
@@ -708,7 +741,7 @@ func TestDeleteDocument(t *testing.T) {
 	}
 
 	validDocument := &model.Documents{
-		ID:           2,
+		ID:           newUUID,
 		CollectionID: validCollection.ID,
 		Content:      `{"foo": "bar"}`,
 		CreatedAt:    now,
@@ -726,8 +759,8 @@ func TestDeleteDocument(t *testing.T) {
 		{
 			scenario: "Will delete an existing document and return its data",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &DeleteDocumentParams{
@@ -746,12 +779,12 @@ func TestDeleteDocument(t *testing.T) {
 		{
 			scenario: "Will throw an error when the document does not exists",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &DeleteDocumentParams{
-				ID: -1,
+				ID: badUUID,
 			},
 			existingDocuments: []*model.Documents{validDocument},
 			expected: expected{
@@ -764,8 +797,8 @@ func TestDeleteDocument(t *testing.T) {
 		{
 			scenario: "Will fail when the key cannot write to the database",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			params: &DeleteDocumentParams{
 				ID: validDocument.ID,
@@ -782,7 +815,7 @@ func TestDeleteDocument(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -797,9 +830,9 @@ func TestDeleteDocument(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID:      1,
+					KeyID:      newUUID,
 					DatabaseID: &existingDatabase.ID,
-					UserID:     1,
+					UserID:     newUUID,
 					Role:       *tc.userCan,
 				})
 				require.NoError(t, err)

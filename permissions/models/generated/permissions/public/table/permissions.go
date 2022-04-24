@@ -17,9 +17,9 @@ type permissionsTable struct {
 	postgres.Table
 
 	//Columns
-	ID         postgres.ColumnInteger
-	KeyID      postgres.ColumnInteger
-	DatabaseID postgres.ColumnInteger
+	ID         postgres.ColumnString
+	KeyID      postgres.ColumnString
+	DatabaseID postgres.ColumnString
 	Role       postgres.ColumnString
 	CreatedAt  postgres.ColumnTimestampz
 	UpdatedAt  postgres.ColumnTimestampz
@@ -53,9 +53,9 @@ func newPermissionsTable(schemaName, tableName, alias string) *PermissionsTable 
 
 func newPermissionsTableImpl(schemaName, tableName, alias string) permissionsTable {
 	var (
-		IDColumn         = postgres.IntegerColumn("id")
-		KeyIDColumn      = postgres.IntegerColumn("key_id")
-		DatabaseIDColumn = postgres.IntegerColumn("database_id")
+		IDColumn         = postgres.StringColumn("id")
+		KeyIDColumn      = postgres.StringColumn("key_id")
+		DatabaseIDColumn = postgres.StringColumn("database_id")
 		RoleColumn       = postgres.StringColumn("role")
 		CreatedAtColumn  = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn  = postgres.TimestampzColumn("updated_at")

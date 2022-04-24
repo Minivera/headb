@@ -17,9 +17,9 @@ type databasesTable struct {
 	postgres.Table
 
 	//Columns
-	ID        postgres.ColumnInteger
+	ID        postgres.ColumnString
 	Name      postgres.ColumnString
-	UserID    postgres.ColumnInteger
+	UserID    postgres.ColumnString
 	CreatedAt postgres.ColumnTimestampz
 	UpdatedAt postgres.ColumnTimestampz
 
@@ -52,9 +52,9 @@ func newDatabasesTable(schemaName, tableName, alias string) *DatabasesTable {
 
 func newDatabasesTableImpl(schemaName, tableName, alias string) databasesTable {
 	var (
-		IDColumn        = postgres.IntegerColumn("id")
+		IDColumn        = postgres.StringColumn("id")
 		NameColumn      = postgres.StringColumn("name")
-		UserIDColumn    = postgres.IntegerColumn("user_id")
+		UserIDColumn    = postgres.StringColumn("user_id")
 		CreatedAtColumn = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn = postgres.TimestampzColumn("updated_at")
 		allColumns      = postgres.ColumnList{IDColumn, NameColumn, UserIDColumn, CreatedAtColumn, UpdatedAtColumn}

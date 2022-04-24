@@ -2,13 +2,13 @@ package content
 
 import (
 	"context"
-	"strconv"
 	"testing"
 	"time"
 
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
+	"encore.dev/types/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -72,24 +72,33 @@ func TestListCollections(t *testing.T) {
 		err      error
 	}
 
+	newUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	secondUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	badUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
 	existingDatabase := &model.Databases{
-		ID:        1,
+		ID:        newUUID,
 		Name:      "test",
-		UserID:    1,
+		UserID:    newUUID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	validCollections := []*model.Collections{
 		{
-			ID:         2,
+			ID:         newUUID,
 			DatabaseID: existingDatabase.ID,
 			Name:       "test",
 			CreatedAt:  now,
 			UpdatedAt:  now,
 		},
 		{
-			ID:         3,
+			ID:         secondUUID,
 			DatabaseID: existingDatabase.ID,
 			Name:       "test2",
 			CreatedAt:  now,
@@ -111,8 +120,8 @@ func TestListCollections(t *testing.T) {
 				DatabaseID: existingDatabase.ID,
 			},
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan:             test_utils.StringPointer("read"),
 			existingCollections: validCollections,
@@ -129,8 +138,8 @@ func TestListCollections(t *testing.T) {
 			},
 			userCan: test_utils.StringPointer("read"),
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			existingCollections: []*model.Collections{},
 			expected: expected{
@@ -142,12 +151,12 @@ func TestListCollections(t *testing.T) {
 		{
 			scenario: "Fails when the database to fetch collections from doesn't exist",
 			params: &ListCollectionsParams{
-				DatabaseID: -1,
+				DatabaseID: badUUID,
 			},
 			userCan: test_utils.StringPointer("read"),
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			existingCollections: validCollections,
 			expected: expected{
@@ -163,8 +172,8 @@ func TestListCollections(t *testing.T) {
 				DatabaseID: existingDatabase.ID,
 			},
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			existingCollections: validCollections,
 			expected: expected{
@@ -178,7 +187,7 @@ func TestListCollections(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -190,9 +199,9 @@ func TestListCollections(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID:      1,
+					KeyID:      newUUID,
 					DatabaseID: &existingDatabase.ID,
-					UserID:     1,
+					UserID:     newUUID,
 					Role:       *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -213,22 +222,31 @@ func TestListCollections(t *testing.T) {
 func TestGetCollection(t *testing.T) {
 	now := time.Now()
 
+	newUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	secondUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	badUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
 	type expected struct {
 		response *GetCollectionResponse
 		err      error
 	}
 
 	existingDatabase := &model.Databases{
-		ID:        1,
+		ID:        newUUID,
 		Name:      "test",
-		UserID:    1,
+		UserID:    newUUID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	validCollections := []*model.Collections{
 		{
-			ID:         2,
+			ID:         newUUID,
 			DatabaseID: existingDatabase.ID,
 			Name:       "test",
 			CreatedAt:  now,
@@ -247,8 +265,8 @@ func TestGetCollection(t *testing.T) {
 		{
 			scenario: "Returns a collection by ID, owned by a user",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan:             test_utils.StringPointer("read"),
 			params:              &GetCollectionParams{ID: validCollections[0].ID},
@@ -262,11 +280,11 @@ func TestGetCollection(t *testing.T) {
 		{
 			scenario: "Returns an error when the collection is not found",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan:             test_utils.StringPointer("read"),
-			params:              &GetCollectionParams{ID: 3},
+			params:              &GetCollectionParams{ID: secondUUID},
 			existingCollections: validCollections,
 			expected: expected{
 				err: &errs.Error{
@@ -278,8 +296,8 @@ func TestGetCollection(t *testing.T) {
 		{
 			scenario: "Returns an error when the user does not own the collection",
 			userData: &identity.UserData{
-				ID:    2,
-				KeyID: 1,
+				ID:    badUUID,
+				KeyID: newUUID,
 			},
 			userCan:             test_utils.StringPointer("read"),
 			params:              &GetCollectionParams{ID: validCollections[0].ID},
@@ -294,8 +312,8 @@ func TestGetCollection(t *testing.T) {
 		{
 			scenario: "Fails when the key cannot read the database",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			params:              &GetCollectionParams{ID: validCollections[0].ID},
 			existingCollections: validCollections,
@@ -310,7 +328,7 @@ func TestGetCollection(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -322,9 +340,9 @@ func TestGetCollection(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID:      1,
+					KeyID:      newUUID,
 					DatabaseID: &existingDatabase.ID,
-					UserID:     1,
+					UserID:     newUUID,
 					Role:       *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -351,10 +369,19 @@ func TestCreateCollection(t *testing.T) {
 		err      error
 	}
 
+	newUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	secondUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	badUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
 	existingDatabase := &model.Databases{
-		ID:        1,
+		ID:        newUUID,
 		Name:      "test",
-		UserID:    1,
+		UserID:    newUUID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -370,8 +397,8 @@ func TestCreateCollection(t *testing.T) {
 		{
 			scenario: "Will create and return a collection",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &CreateCollectionParams{
@@ -389,17 +416,17 @@ func TestCreateCollection(t *testing.T) {
 		{
 			scenario: "Will throw an error when a the database cannot be found",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &CreateCollectionParams{
-				DatabaseID: -1,
+				DatabaseID: badUUID,
 				Name:       "test",
 			},
 			existingCollections: []*model.Collections{
 				{
-					ID:         2,
+					ID:         secondUUID,
 					DatabaseID: existingDatabase.ID,
 					Name:       "test",
 					CreatedAt:  now,
@@ -416,8 +443,8 @@ func TestCreateCollection(t *testing.T) {
 		{
 			scenario: "Will throw an error when a collection already exists",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &CreateCollectionParams{
@@ -426,7 +453,7 @@ func TestCreateCollection(t *testing.T) {
 			},
 			existingCollections: []*model.Collections{
 				{
-					ID:         2,
+					ID:         secondUUID,
 					DatabaseID: existingDatabase.ID,
 					Name:       "test",
 					CreatedAt:  now,
@@ -443,8 +470,8 @@ func TestCreateCollection(t *testing.T) {
 		{
 			scenario: "Will throw an error fi the user cannot write to the database",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			params: &CreateCollectionParams{
 				DatabaseID: existingDatabase.ID,
@@ -461,7 +488,7 @@ func TestCreateCollection(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -473,9 +500,9 @@ func TestCreateCollection(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID:      1,
+					KeyID:      newUUID,
 					DatabaseID: &existingDatabase.ID,
-					UserID:     1,
+					UserID:     newUUID,
 					Role:       *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -501,16 +528,25 @@ func TestUpdateCollection(t *testing.T) {
 		err      error
 	}
 
+	newUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	secondUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	badUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
 	existingDatabase := &model.Databases{
-		ID:        1,
+		ID:        newUUID,
 		Name:      "test",
-		UserID:    1,
+		UserID:    newUUID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	validCollection := &model.Collections{
-		ID:         2,
+		ID:         secondUUID,
 		DatabaseID: existingDatabase.ID,
 		Name:       "test",
 		CreatedAt:  now,
@@ -528,8 +564,8 @@ func TestUpdateCollection(t *testing.T) {
 		{
 			scenario: "Will update an existing collection and return its data",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &UpdateCollectionParams{
@@ -549,12 +585,12 @@ func TestUpdateCollection(t *testing.T) {
 		{
 			scenario: "Will throw an error when the collection does not exists",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &UpdateCollectionParams{
-				ID:   -1,
+				ID:   badUUID,
 				Name: "updated",
 			},
 			existingCollections: []*model.Collections{validCollection},
@@ -568,8 +604,8 @@ func TestUpdateCollection(t *testing.T) {
 		{
 			scenario: "Will throw an error when a collection with this name already exists",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &UpdateCollectionParams{
@@ -587,8 +623,8 @@ func TestUpdateCollection(t *testing.T) {
 		{
 			scenario: "Will fail if the key cannot write to the database",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			params: &UpdateCollectionParams{
 				ID:   validCollection.ID,
@@ -606,7 +642,7 @@ func TestUpdateCollection(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -618,9 +654,9 @@ func TestUpdateCollection(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID:      1,
+					KeyID:      newUUID,
 					DatabaseID: &existingDatabase.ID,
-					UserID:     1,
+					UserID:     newUUID,
 					Role:       *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -646,16 +682,25 @@ func TestDeleteCollection(t *testing.T) {
 		err      error
 	}
 
+	newUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	secondUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
+	badUUID, err := uuid.NewV4()
+	require.NoError(t, err)
+
 	existingDatabase := &model.Databases{
-		ID:        1,
+		ID:        newUUID,
 		Name:      "test",
-		UserID:    1,
+		UserID:    newUUID,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
 
 	validCollection := &model.Collections{
-		ID:         2,
+		ID:         secondUUID,
 		DatabaseID: existingDatabase.ID,
 		Name:       "test",
 		CreatedAt:  now,
@@ -673,8 +718,8 @@ func TestDeleteCollection(t *testing.T) {
 		{
 			scenario: "Will delete an existing collection and return its data",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &DeleteCollectionParams{
@@ -693,12 +738,12 @@ func TestDeleteCollection(t *testing.T) {
 		{
 			scenario: "Will throw an error when the collection does not exists",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			userCan: test_utils.StringPointer("write"),
 			params: &DeleteCollectionParams{
-				ID: -1,
+				ID: badUUID,
 			},
 			existingCollections: []*model.Collections{validCollection},
 			expected: expected{
@@ -711,8 +756,8 @@ func TestDeleteCollection(t *testing.T) {
 		{
 			scenario: "Will fail if the key cannot write to the database",
 			userData: &identity.UserData{
-				ID:    1,
-				KeyID: 1,
+				ID:    newUUID,
+				KeyID: newUUID,
 			},
 			params: &DeleteCollectionParams{
 				ID: validCollection.ID,
@@ -729,7 +774,7 @@ func TestDeleteCollection(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -741,9 +786,9 @@ func TestDeleteCollection(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID:      1,
+					KeyID:      newUUID,
 					DatabaseID: &existingDatabase.ID,
-					UserID:     1,
+					UserID:     newUUID,
 					Role:       *tc.userCan,
 				})
 				require.NoError(t, err)

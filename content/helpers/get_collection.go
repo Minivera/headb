@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"encore.dev/beta/errs"
+	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/qrm"
 	log "github.com/sirupsen/logrus"
 
@@ -14,7 +15,7 @@ import (
 
 // GetCollection gets a collection from a collection ID and a user ID, and returns a valid encore error
 // if the collection could not be fetched.
-func GetCollection(ctx context.Context, collectionID, userID int64) (*model.Collections, error) {
+func GetCollection(ctx context.Context, collectionID uuid.UUID, userID uuid.UUID) (*model.Collections, error) {
 	collection, err := models.GetCollectionByID(ctx, collectionID, userID)
 	if errors.Is(err, qrm.ErrNoRows) {
 		log.WithError(err).Warning("Could not find collection by ID for document")

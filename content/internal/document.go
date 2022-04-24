@@ -7,6 +7,7 @@ import (
 	"encore.app/content/helpers"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
+	"encore.dev/types/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/content/convert"
@@ -15,7 +16,7 @@ import (
 )
 
 // ListDocuments lists all documents created by the authenticated user for a given collection
-func ListDocuments(ctx context.Context, collectionID int64) ([]convert.DocumentPayload, error) {
+func ListDocuments(ctx context.Context, collectionID uuid.UUID) ([]convert.DocumentPayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	collection, err := helpers.GetCollection(ctx, collectionID, userData.ID)
@@ -52,7 +53,7 @@ func ListDocuments(ctx context.Context, collectionID int64) ([]convert.DocumentP
 }
 
 // GetDocument finds a document by ID
-func GetDocument(ctx context.Context, id int64) (convert.DocumentPayload, error) {
+func GetDocument(ctx context.Context, id uuid.UUID) (convert.DocumentPayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	document, err := helpers.GetDocument(ctx, id, userData.ID)
@@ -85,7 +86,7 @@ func GetDocument(ctx context.Context, id int64) (convert.DocumentPayload, error)
 }
 
 // CreateDocument creates a document for the authenticated user
-func CreateDocument(ctx context.Context, collectionID int64, content json.RawMessage) (convert.DocumentPayload, error) {
+func CreateDocument(ctx context.Context, collectionID uuid.UUID, content json.RawMessage) (convert.DocumentPayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	collection, err := helpers.GetCollection(ctx, collectionID, userData.ID)
@@ -100,8 +101,8 @@ func CreateDocument(ctx context.Context, collectionID int64, content json.RawMes
 		}
 	}
 
-	_, err = content.MarshalJSON()
-	if string(content) == "null" || err != nil {
+	unmarshalled, err := content.MarshalJSON()
+	if content == nil || string(unmarshalled) == "null" || err != nil {
 		log.WithError(err).Warning("Could not validate JSON on document request")
 		return convert.DocumentPayload{}, &errs.Error{
 			Code:    errs.InvalidArgument,
@@ -133,7 +134,7 @@ func CreateDocument(ctx context.Context, collectionID int64, content json.RawMes
 }
 
 // UpdateDocument updates a document by ID for the authenticated user
-func UpdateDocument(ctx context.Context, id int64, content json.RawMessage) (convert.DocumentPayload, error) {
+func UpdateDocument(ctx context.Context, id uuid.UUID, content json.RawMessage) (convert.DocumentPayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	document, err := helpers.GetDocument(ctx, id, userData.ID)
@@ -153,8 +154,8 @@ func UpdateDocument(ctx context.Context, id int64, content json.RawMessage) (con
 		}
 	}
 
-	_, err = content.MarshalJSON()
-	if string(content) == "null" || err != nil {
+	unmarshalled, err := content.MarshalJSON()
+	if content == nil || string(unmarshalled) == "null" || err != nil {
 		log.WithError(err).Warning("Could not validate JSON on document request")
 		return convert.DocumentPayload{}, &errs.Error{
 			Code:    errs.InvalidArgument,
@@ -186,7 +187,7 @@ func UpdateDocument(ctx context.Context, id int64, content json.RawMessage) (con
 }
 
 // DeleteDocument deletes a document by ID for the authenticated user
-func DeleteDocument(ctx context.Context, id int64) (convert.DocumentPayload, error) {
+func DeleteDocument(ctx context.Context, id uuid.UUID) (convert.DocumentPayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	document, err := helpers.GetDocument(ctx, id, userData.ID)

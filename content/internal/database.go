@@ -7,6 +7,7 @@ import (
 	"encore.app/content/helpers"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
+	"encore.dev/types/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/content/convert"
@@ -38,7 +39,7 @@ func ListDatabases(ctx context.Context) ([]convert.DatabasePayload, error) {
 }
 
 // GetDatabase Finds a database by ID
-func GetDatabase(ctx context.Context, id int64) (convert.DatabasePayload, error) {
+func GetDatabase(ctx context.Context, id uuid.UUID) (convert.DatabasePayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	database, err := helpers.GetDatabase(ctx, id, userData.ID)
@@ -92,7 +93,7 @@ func CreateDatabase(ctx context.Context, name string) (convert.DatabasePayload, 
 }
 
 // UpdateDatabase updates a database by ID for the authenticated user
-func UpdateDatabase(ctx context.Context, id int64, name string) (convert.DatabasePayload, error) {
+func UpdateDatabase(ctx context.Context, id uuid.UUID, name string) (convert.DatabasePayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	database, err := helpers.GetDatabase(ctx, id, userData.ID)
@@ -132,7 +133,7 @@ func UpdateDatabase(ctx context.Context, id int64, name string) (convert.Databas
 }
 
 // DeleteDatabase deletes a database by ID for the authenticated user
-func DeleteDatabase(ctx context.Context, id int64) (convert.DatabasePayload, error) {
+func DeleteDatabase(ctx context.Context, id uuid.UUID) (convert.DatabasePayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	database, err := helpers.GetDatabase(ctx, id, userData.ID)

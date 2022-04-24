@@ -8,11 +8,12 @@
 package model
 
 import (
+	"encore.dev/types/uuid"
 	"time"
 )
 
 type Users struct {
-	ID        int64 `sql:"primary_key"`
+	ID        uuid.UUID `sql:"primary_key"`
 	Username  *string
 	Token     *string
 	CreatedAt time.Time

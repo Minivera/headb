@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 
+	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/postgres"
 	log "github.com/sirupsen/logrus"
 
@@ -12,7 +13,7 @@ import (
 
 // NewCollection generates a new collection structure from a name and the
 // associated database ID.
-func NewCollection(name string, databaseID int64) *model.Collections {
+func NewCollection(name string, databaseID uuid.UUID) *model.Collections {
 	return &model.Collections{
 		Name:       name,
 		DatabaseID: databaseID,
@@ -21,7 +22,7 @@ func NewCollection(name string, databaseID int64) *model.Collections {
 
 // ListCollections lists all collections for a given database, it returns
 // a nil collection on an error.
-func ListCollections(ctx context.Context, databaseID int64) ([]*model.Collections, error) {
+func ListCollections(ctx context.Context, databaseID uuid.UUID) ([]*model.Collections, error) {
 	statement := postgres.SELECT(
 		table.Collections.ID,
 		table.Collections.Name,
@@ -29,7 +30,7 @@ func ListCollections(ctx context.Context, databaseID int64) ([]*model.Collection
 		table.Collections.UpdatedAt,
 		table.Collections.CreatedAt,
 	).FROM(table.Collections).WHERE(
-		table.Collections.DatabaseID.EQ(postgres.Int64(databaseID)),
+		table.Collections.DatabaseID.EQ(postgres.UUID(databaseID)),
 	)
 
 	var collections []*model.Collections
@@ -44,7 +45,7 @@ func ListCollections(ctx context.Context, databaseID int64) ([]*model.Collection
 
 // GetCollectionByID fetches a single collection record given an ID and the associated
 // database ID. Returns nil on an error.
-func GetCollectionByID(ctx context.Context, id, userID int64) (*model.Collections, error) {
+func GetCollectionByID(ctx context.Context, id, userID uuid.UUID) (*model.Collections, error) {
 	statement := postgres.SELECT(
 		table.Collections.ID,
 		table.Collections.Name,
@@ -57,8 +58,8 @@ func GetCollectionByID(ctx context.Context, id, userID int64) (*model.Collection
 			table.Collections.DatabaseID.EQ(table.Databases.ID),
 		),
 	).WHERE(
-		table.Collections.ID.EQ(postgres.Int64(id)).
-			AND(table.Databases.UserID.EQ(postgres.Int64(userID))),
+		table.Collections.ID.EQ(postgres.UUID(id)).
+			AND(table.Databases.UserID.EQ(postgres.UUID(userID))),
 	).LIMIT(1)
 
 	collection := model.Collections{}
@@ -80,12 +81,12 @@ func ValidateCollectionConstraint(ctx context.Context, collection *model.Collect
 		table.Collections,
 	).WHERE(
 		table.Collections.Name.EQ(postgres.String(collection.Name)).
-			AND(table.Collections.DatabaseID.EQ(postgres.Int64(collection.DatabaseID))),
+			AND(table.Collections.DatabaseID.EQ(postgres.UUID(collection.DatabaseID))),
 	).LIMIT(1).Sql()
 
-	id := 0
+	id := uuid.Nil
 	err := db.QueryRowContext(ctx, query, args...).Scan(&id)
-	if err == nil && id != 0 {
+	if err == nil && id != uuid.Nil {
 		log.Warning("Tried to save collection, a collection already exists for this name and database_id")
 		return false
 	}
@@ -97,7 +98,7 @@ func ValidateCollectionConstraint(ctx context.Context, collection *model.Collect
 // the name and database ID from the struct and updates the timestamps. SaveCollection will
 // trigger an error if the constraints are not respected.
 func SaveCollection(ctx context.Context, collection *model.Collections) error {
-	if collection.ID == 0 {
+	if collection.ID == uuid.Nil {
 		query, args := table.Collections.INSERT(
 			table.Collections.Name,
 			table.Collections.DatabaseID,
@@ -124,9 +125,9 @@ func SaveCollection(ctx context.Context, collection *model.Collections) error {
 
 	query, args := table.Collections.UPDATE().SET(
 		table.Collections.Name.SET(postgres.String(collection.Name)),
-		table.Collections.DatabaseID.SET(postgres.Int64(collection.DatabaseID)),
+		table.Collections.DatabaseID.SET(postgres.UUID(collection.DatabaseID)),
 	).WHERE(
-		table.Collections.ID.EQ(postgres.Int64(collection.ID)),
+		table.Collections.ID.EQ(postgres.UUID(collection.ID)),
 	).RETURNING(
 		table.Collections.ID,
 		table.Collections.UpdatedAt,
@@ -149,13 +150,13 @@ func SaveCollection(ctx context.Context, collection *model.Collections) error {
 func DeleteCollection(ctx context.Context, collection *model.Collections) error {
 	query, args := table.Collections.
 		DELETE().
-		WHERE(table.Collections.ID.EQ(postgres.Int64(collection.ID))).
+		WHERE(table.Collections.ID.EQ(postgres.UUID(collection.ID))).
 		RETURNING(table.Collections.ID).
 		Sql()
 
-	deletedID := 0
+	deletedID := uuid.Nil
 	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
-	if err != nil || deletedID == 0 {
+	if err != nil || deletedID == uuid.Nil {
 		log.WithError(err).Error("Could not delete collection")
 		return err
 	}

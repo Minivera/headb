@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"encore.dev/beta/errs"
+	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/qrm"
 	log "github.com/sirupsen/logrus"
 
@@ -16,7 +17,7 @@ import (
 // AddPermissionSet adds a new permission set for an API key on an optional database.
 // Will assign the role to the set and ignore any duplicates, since that means no
 // permissions needs to be added.
-func AddPermissionSet(ctx context.Context, keyID, userID int64, databaseID *int64, givenRole string) (*model.Permissions, error) {
+func AddPermissionSet(ctx context.Context, keyID, userID uuid.UUID, databaseID *uuid.UUID, givenRole string) (*model.Permissions, error) {
 	role := model.Role("")
 	err := role.Scan(givenRole)
 	if err != nil {
@@ -57,7 +58,7 @@ func AddPermissionSet(ctx context.Context, keyID, userID int64, databaseID *int6
 }
 
 // RemovePermissionSet removes a permission set using an ID.
-func RemovePermissionSet(ctx context.Context, id int64) (*model.Permissions, error) {
+func RemovePermissionSet(ctx context.Context, id uuid.UUID) (*model.Permissions, error) {
 	permissionSet, err := models.GetPermissionByID(ctx, id)
 	if errors.Is(err, qrm.ErrNoRows) {
 		log.WithError(err).Warning("Could not find permission by the given ID")
@@ -89,10 +90,10 @@ func RemovePermissionSet(ctx context.Context, id int64) (*model.Permissions, err
 // no ID is provided) given the operation.
 type CanParams struct {
 	// The unique ID of the key to assign this permission to
-	KeyID int64
+	KeyID uuid.UUID
 
 	// The unique ID of the database to assign this permission to, if any
-	DatabaseID *int64
+	DatabaseID *uuid.UUID
 
 	// The operation to validate, should be a role
 	Operation string
@@ -105,7 +106,7 @@ type CanResponse struct {
 }
 
 // Can validates if a key can take the provided operation on a database or all databases.
-func Can(ctx context.Context, keyID int64, databaseID *int64, givenOperation string) (bool, error) {
+func Can(ctx context.Context, keyID uuid.UUID, databaseID *uuid.UUID, givenOperation string) (bool, error) {
 	operation := model.Role("")
 	err := operation.Scan(givenOperation)
 	if err != nil {
