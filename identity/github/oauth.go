@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -128,9 +129,15 @@ func (c OAuthClient) RequestDeviceCode() (DeviceCodeResponse, error) {
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode > 400 {
+	if response.StatusCode >= 400 {
+		var body string
+		if b, err := io.ReadAll(response.Body); err == nil {
+			body = string(b)
+		}
+
 		log.WithFields(log.Fields{
 			"status_code": response.StatusCode,
+			"body":        body,
 		}).WithError(err).Error("Could not request device code, request error")
 		return DeviceCodeResponse{}, fmt.Errorf("could not request device code, %s error", response.StatusCode)
 	}

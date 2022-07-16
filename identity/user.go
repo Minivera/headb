@@ -27,7 +27,7 @@ type SignInResponse struct {
 	ApiKey string
 }
 
-// SignIn creates a user account for the given username.
+// SignIn runs the console signIn process using the device code process from GitHub.
 //encore:api public
 func SignIn(ctx context.Context) (*SignInResponse, error) {
 	client := github.NewOAuthClient(github.NewOAuthClientOptions{
