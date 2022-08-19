@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"encore.dev/storage/sqldb"
-	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/postgres"
 	log "github.com/sirupsen/logrus"
 
@@ -16,7 +15,7 @@ var db = sqldb.Named("content").Stdlib()
 
 // NewDatabase generates a new database structure from a name and the
 // associated user ID.
-func NewDatabase(name string, userID uuid.UUID) *model.Databases {
+func NewDatabase(name string, userID int64) *model.Databases {
 	return &model.Databases{
 		Name:   name,
 		UserID: userID,
@@ -25,7 +24,7 @@ func NewDatabase(name string, userID uuid.UUID) *model.Databases {
 
 // ListDatabase lists all databases for a given user, it returns
 // a nil database on an error.
-func ListDatabase(ctx context.Context, userID uuid.UUID) ([]*model.Databases, error) {
+func ListDatabase(ctx context.Context, userID int64) ([]*model.Databases, error) {
 	statement := postgres.SELECT(
 		table.Databases.ID,
 		table.Databases.Name,
@@ -33,7 +32,7 @@ func ListDatabase(ctx context.Context, userID uuid.UUID) ([]*model.Databases, er
 		table.Databases.UpdatedAt,
 		table.Databases.CreatedAt,
 	).FROM(table.Databases).WHERE(
-		table.Databases.UserID.EQ(postgres.UUID(userID)),
+		table.Databases.UserID.EQ(postgres.Int64(userID)),
 	)
 
 	var databases []*model.Databases
@@ -48,7 +47,7 @@ func ListDatabase(ctx context.Context, userID uuid.UUID) ([]*model.Databases, er
 
 // GetDatabaseByID fetches a single database record given an ID and the associated
 // user ID. Returns nil on an error.
-func GetDatabaseByID(ctx context.Context, id, userID uuid.UUID) (*model.Databases, error) {
+func GetDatabaseByID(ctx context.Context, id, userID int64) (*model.Databases, error) {
 	statement := postgres.SELECT(
 		table.Databases.ID,
 		table.Databases.Name,
@@ -58,8 +57,8 @@ func GetDatabaseByID(ctx context.Context, id, userID uuid.UUID) (*model.Database
 	).FROM(
 		table.Databases,
 	).WHERE(
-		table.Databases.ID.EQ(postgres.UUID(id)).
-			AND(table.Databases.UserID.EQ(postgres.UUID(userID))),
+		table.Databases.ID.EQ(postgres.Int64(id)).
+			AND(table.Databases.UserID.EQ(postgres.Int64(userID))),
 	).LIMIT(1)
 
 	database := model.Databases{}
@@ -81,12 +80,12 @@ func ValidateDatabaseConstraint(ctx context.Context, database *model.Databases) 
 		table.Databases,
 	).WHERE(
 		table.Databases.Name.EQ(postgres.String(database.Name)).
-			AND(table.Databases.UserID.EQ(postgres.UUID(database.UserID))),
+			AND(table.Databases.UserID.EQ(postgres.Int64(database.UserID))),
 	).LIMIT(1).Sql()
 
-	id := uuid.Nil
+	id := 0
 	err := db.QueryRowContext(ctx, query, args...).Scan(&id)
-	if err == nil && id != uuid.Nil {
+	if err == nil && id != 0 {
 		log.Warning("Tried to save database, a database already exists for this name and user_id")
 		return false
 	}
@@ -98,7 +97,7 @@ func ValidateDatabaseConstraint(ctx context.Context, database *model.Databases) 
 // the name and user ID from the struct and updates the timestamps. SaveDatabase will
 // trigger an error if the constraints are not respected.
 func SaveDatabase(ctx context.Context, database *model.Databases) error {
-	if database.ID == uuid.Nil {
+	if database.ID == 0 {
 		query, args := table.Databases.INSERT(
 			table.Databases.Name,
 			table.Databases.UserID,
@@ -125,9 +124,9 @@ func SaveDatabase(ctx context.Context, database *model.Databases) error {
 
 	query, args := table.Databases.UPDATE().SET(
 		table.Databases.Name.SET(postgres.String(database.Name)),
-		table.Databases.UserID.SET(postgres.UUID(database.UserID)),
+		table.Databases.UserID.SET(postgres.Int64(database.UserID)),
 	).WHERE(
-		table.Databases.ID.EQ(postgres.UUID(database.ID)),
+		table.Databases.ID.EQ(postgres.Int64(database.ID)),
 	).RETURNING(
 		table.Databases.ID,
 		table.Databases.UpdatedAt,
@@ -150,13 +149,13 @@ func SaveDatabase(ctx context.Context, database *model.Databases) error {
 func DeleteDatabase(ctx context.Context, database *model.Databases) error {
 	query, args := table.Databases.
 		DELETE().
-		WHERE(table.Databases.ID.EQ(postgres.UUID(database.ID))).
+		WHERE(table.Databases.ID.EQ(postgres.Int64(database.ID))).
 		RETURNING(table.Databases.ID).
 		Sql()
 
-	deletedID := uuid.Nil
+	deletedID := 0
 	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
-	if err != nil || deletedID == uuid.Nil {
+	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete database")
 		return err
 	}

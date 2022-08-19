@@ -1,9 +1,7 @@
-CREATE EXTENSION "uuid-ossp";
-
 CREATE TABLE "databases" (
-   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+   id BIGSERIAL PRIMARY KEY,
    name VARCHAR(255) NOT NULL,
-   user_id UUID NOT NULL,
+   user_id BIGINT NOT NULL,
    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

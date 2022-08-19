@@ -17,9 +17,9 @@ type aPIKeysTable struct {
 	postgres.Table
 
 	//Columns
-	ID         postgres.ColumnString
+	ID         postgres.ColumnInteger
 	Value      postgres.ColumnString
-	UserID     postgres.ColumnString
+	UserID     postgres.ColumnInteger
 	LastUsedAt postgres.ColumnTimestampz
 	CreatedAt  postgres.ColumnTimestampz
 	UpdatedAt  postgres.ColumnTimestampz
@@ -53,9 +53,9 @@ func newAPIKeysTable(schemaName, tableName, alias string) *APIKeysTable {
 
 func newAPIKeysTableImpl(schemaName, tableName, alias string) aPIKeysTable {
 	var (
-		IDColumn         = postgres.StringColumn("id")
+		IDColumn         = postgres.IntegerColumn("id")
 		ValueColumn      = postgres.StringColumn("value")
-		UserIDColumn     = postgres.StringColumn("user_id")
+		UserIDColumn     = postgres.IntegerColumn("user_id")
 		LastUsedAtColumn = postgres.TimestampzColumn("last_used_at")
 		CreatedAtColumn  = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn  = postgres.TimestampzColumn("updated_at")

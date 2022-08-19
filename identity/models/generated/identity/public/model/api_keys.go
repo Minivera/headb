@@ -8,14 +8,13 @@
 package model
 
 import (
-	"encore.dev/types/uuid"
 	"time"
 )
 
 type APIKeys struct {
-	ID         uuid.UUID `sql:"primary_key"`
+	ID         int64 `sql:"primary_key"`
 	Value      string
-	UserID     uuid.UUID
+	UserID     int64
 	LastUsedAt time.Time
 	CreatedAt  time.Time
 	UpdatedAt  time.Time

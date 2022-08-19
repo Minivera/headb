@@ -17,9 +17,9 @@ type collectionsTable struct {
 	postgres.Table
 
 	//Columns
-	ID         postgres.ColumnString
+	ID         postgres.ColumnInteger
 	Name       postgres.ColumnString
-	DatabaseID postgres.ColumnString
+	DatabaseID postgres.ColumnInteger
 	CreatedAt  postgres.ColumnTimestampz
 	UpdatedAt  postgres.ColumnTimestampz
 
@@ -52,9 +52,9 @@ func newCollectionsTable(schemaName, tableName, alias string) *CollectionsTable 
 
 func newCollectionsTableImpl(schemaName, tableName, alias string) collectionsTable {
 	var (
-		IDColumn         = postgres.StringColumn("id")
+		IDColumn         = postgres.IntegerColumn("id")
 		NameColumn       = postgres.StringColumn("name")
-		DatabaseIDColumn = postgres.StringColumn("database_id")
+		DatabaseIDColumn = postgres.IntegerColumn("database_id")
 		CreatedAtColumn  = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn  = postgres.TimestampzColumn("updated_at")
 		allColumns       = postgres.ColumnList{IDColumn, NameColumn, DatabaseIDColumn, CreatedAtColumn, UpdatedAtColumn}

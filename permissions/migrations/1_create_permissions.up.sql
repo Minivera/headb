@@ -1,11 +1,9 @@
-CREATE EXTENSION "uuid-ossp";
-
 CREATE TYPE role AS ENUM ('admin', 'write', 'read');
 
 CREATE TABLE "permissions" (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    key_id UUID NOT NULL,
-    database_id UUID,
+    id BIGSERIAL PRIMARY KEY,
+    key_id BIGINT NOT NULL,
+    database_id BIGINT,
     role role NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

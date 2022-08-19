@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"encore.dev/beta/errs"
-	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/qrm"
 	log "github.com/sirupsen/logrus"
 
@@ -15,7 +14,7 @@ import (
 
 // GetUser gets a user from a user ID and returns a valid encore error
 // if the user could not be fetched.
-func GetUser(ctx context.Context, userID uuid.UUID) (*model.Users, error) {
+func GetUser(ctx context.Context, userID int64) (*model.Users, error) {
 	user, err := models.GetUserByID(ctx, userID)
 	if errors.Is(err, qrm.ErrNoRows) {
 		log.WithError(err).Warning("Could not find user by the given ID")

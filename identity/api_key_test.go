@@ -2,13 +2,13 @@ package identity
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
-	"encore.dev/types/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -56,21 +56,15 @@ func TestGenerateApiKey(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	badUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	existingUser := &model.Users{
-		ID:       newUUID,
+		ID:       1,
 		Username: test_utils.StringPointer("test"),
 		UniqueID: test_utils.StringPointer("1234"),
 		Status:   model.UserStatus_Accepted,
 	}
 
 	existingKey := &model.APIKeys{
-		ID:         newUUID,
+		ID:         2,
 		UserID:     existingUser.ID,
 		Value:      "test",
 		LastUsedAt: time.Now(),
@@ -81,7 +75,7 @@ func TestGenerateApiKey(t *testing.T) {
 	// Use models directly to avoid cyclic dependencies
 	// FIXME: Fix this
 	existingDatabase := content_models.NewDatabase("test", existingUser.ID)
-	err = content_models.SaveDatabase(context.Background(), existingDatabase)
+	err := content_models.SaveDatabase(context.Background(), existingDatabase)
 	require.NoError(t, err)
 
 	defer test_utils_content.Cleanup(context.Background())
@@ -112,7 +106,7 @@ func TestGenerateApiKey(t *testing.T) {
 			scenario: "Will generate a valid API Key for a database",
 			params: &GenerateApiKeyParams{
 				Role:       "write",
-				DatabaseID: test_utils_permissions.UUIDPointer(existingDatabase.ID),
+				DatabaseID: test_utils_permissions.Int64Pointer(existingDatabase.ID),
 			},
 			userData: &UserData{
 				ID:       existingUser.ID,
@@ -160,7 +154,7 @@ func TestGenerateApiKey(t *testing.T) {
 		{
 			scenario: "Will fail if the authenticated user is not found",
 			userData: &UserData{
-				ID:    badUUID,
+				ID:    -1,
 				KeyID: existingKey.ID,
 			},
 			usingAdminKey: true,
@@ -178,7 +172,7 @@ func TestGenerateApiKey(t *testing.T) {
 			scenario: "Will fail if the database cannot be found",
 			params: &GenerateApiKeyParams{
 				Role:       "write",
-				DatabaseID: test_utils_permissions.UUIDPointer(badUUID),
+				DatabaseID: test_utils_permissions.Int64Pointer(-1),
 			},
 			userData: &UserData{
 				ID:       existingUser.ID,
@@ -197,7 +191,7 @@ func TestGenerateApiKey(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
@@ -248,18 +242,15 @@ func TestListApiKeys(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	existingUser := &model.Users{
-		ID:       newUUID,
+		ID:       1,
 		Username: test_utils.StringPointer("test"),
 		UniqueID: test_utils.StringPointer("1234"),
 		Status:   model.UserStatus_Accepted,
 	}
 
 	existingKey := &model.APIKeys{
-		ID:         newUUID,
+		ID:         1,
 		UserID:     existingUser.ID,
 		Value:      "test",
 		LastUsedAt: time.Now(),
@@ -316,7 +307,7 @@ func TestListApiKeys(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
@@ -360,14 +351,8 @@ func TestGetUserForApiKeyInternal(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	badUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	existingUser := &model.Users{
-		ID:       newUUID,
+		ID:       1,
 		Username: test_utils.StringPointer("test"),
 		UniqueID: test_utils.StringPointer("1234"),
 		Status:   model.UserStatus_Accepted,
@@ -381,7 +366,7 @@ func TestGetUserForApiKeyInternal(t *testing.T) {
 
 	now := time.Now()
 	existingKey := &model.APIKeys{
-		ID:         newUUID,
+		ID:         1,
 		UserID:     existingUser.ID,
 		Value:      passwordKeyValue,
 		LastUsedAt: now,
@@ -392,7 +377,7 @@ func TestGetUserForApiKeyInternal(t *testing.T) {
 	keyString, err := keys.EncryptToPaseto(keyValue, existingKey.ID, secrets.SecretPasetoKey)
 	require.NoError(t, err)
 
-	notExistingKeyString, err := keys.EncryptToPaseto(keyValue, badUUID, secrets.SecretPasetoKey)
+	notExistingKeyString, err := keys.EncryptToPaseto(keyValue, 1234, secrets.SecretPasetoKey)
 	require.NoError(t, err)
 
 	tcs := []struct {
@@ -475,14 +460,8 @@ func TestDeleteApiKey(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	badUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	existingUser := &model.Users{
-		ID:       newUUID,
+		ID:       1,
 		Username: test_utils.StringPointer("test"),
 		UniqueID: test_utils.StringPointer("1234"),
 		Status:   model.UserStatus_Accepted,
@@ -490,7 +469,7 @@ func TestDeleteApiKey(t *testing.T) {
 
 	now := time.Now()
 	existingKey := &model.APIKeys{
-		ID:         newUUID,
+		ID:         1,
 		UserID:     existingUser.ID,
 		Value:      "test",
 		LastUsedAt: now,
@@ -549,7 +528,7 @@ func TestDeleteApiKey(t *testing.T) {
 			},
 			usingAdminKey: true,
 			params: &DeleteApiKeyParams{
-				APIKeyID: badUUID,
+				APIKeyID: -1,
 			},
 			expected: expected{
 				err: &errs.Error{
@@ -562,7 +541,7 @@ func TestDeleteApiKey(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)

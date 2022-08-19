@@ -3,15 +3,13 @@ package convert
 import (
 	"time"
 
-	"encore.dev/types/uuid"
-
 	"encore.app/content/models/generated/content/public/model"
 )
 
 // DatabasePayload is an API safe version of a database.
 type DatabasePayload struct {
 	// The database unique identifier
-	ID uuid.UUID
+	ID int64
 
 	// The database unique name
 	Name      string

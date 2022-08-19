@@ -1,7 +1,7 @@
 CREATE TABLE "api_keys" (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     value VARCHAR(60) NOT NULL,
-    user_id UUID DEFAULT uuid_generate_v4() NOT NULL,
+    user_id BIGINT NOT NULL,
     last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

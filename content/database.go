@@ -5,7 +5,6 @@ import (
 
 	"encore.app/content/convert"
 	"encore.app/content/internal"
-	"encore.dev/types/uuid"
 )
 
 // ListDatabasesResponse is the list of databases for the current user
@@ -30,7 +29,7 @@ func ListDatabases(ctx context.Context) (*ListDatabasesResponse, error) {
 // GetDatabaseParams is the parameters for finding a database by ID
 type GetDatabaseParams struct {
 	// The unique identifier of the database
-	ID uuid.UUID
+	ID int64
 }
 
 // GetDatabaseResponse is the result of having fetched a database
@@ -84,7 +83,7 @@ func CreateDatabase(ctx context.Context, params *CreateDatabaseParams) (*CreateD
 // UpdateDatabaseParams is the parameters for updating a database
 type UpdateDatabaseParams struct {
 	// The unique identifier for the database
-	ID uuid.UUID
+	ID int64
 
 	// The name of the database
 	Name string
@@ -116,7 +115,7 @@ func UpdateDatabase(ctx context.Context, params *UpdateDatabaseParams) (*UpdateD
 // DeleteDatabaseParams is the parameters for deleting a database
 type DeleteDatabaseParams struct {
 	// The unique identifier for the database
-	ID uuid.UUID
+	ID int64
 }
 
 // DeleteDatabaseResponse is the result of deleting a database for documents

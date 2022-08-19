@@ -9,7 +9,6 @@ import (
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
-	"encore.dev/types/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/identity/helpers"
@@ -27,7 +26,7 @@ type GenerateApiKeyParams struct {
 	Role string
 
 	// An optional database ID to limit the api key to a specific database.
-	DatabaseID *uuid.UUID
+	DatabaseID *int64
 }
 
 // GenerateApiKeyResponse is the result of the generation of an API key
@@ -141,7 +140,7 @@ func createKeyForUser(ctx context.Context, user *model.Users) (string, *model.AP
 // through an external API request.
 type PublicKey struct {
 	// The unique identifier of the key, can be used to delete it.
-	KeyID uuid.UUID
+	KeyID int64
 
 	// When this key was last used to authenticate a request.
 	LastUsedDate time.Time
@@ -210,7 +209,7 @@ type GetUserForApiKeyInternalParams struct {
 // GetUserForApiKeyInternalResponse is the result of fetching the user using an API key.
 type GetUserForApiKeyInternalResponse struct {
 	// The unique identifier of the key given in the request, for later use.
-	KeyID uuid.UUID
+	KeyID int64
 
 	// The fetched user identified for this API key.
 	User *model.Users
@@ -274,7 +273,7 @@ func GetUserForApiKeyInternal(ctx context.Context, params *GetUserForApiKeyInter
 // DeleteApiKeyParams is the parameters for requesting the deletion of an API key for a user.
 type DeleteApiKeyParams struct {
 	// THe unique identifier of the key to delete
-	APIKeyID uuid.UUID
+	APIKeyID int64
 }
 
 // DeleteApiKeyResponse is the result of the deletion of an API key

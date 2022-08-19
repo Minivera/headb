@@ -17,9 +17,9 @@ type documentsTable struct {
 	postgres.Table
 
 	//Columns
-	ID           postgres.ColumnString
+	ID           postgres.ColumnInteger
 	Content      postgres.ColumnString
-	CollectionID postgres.ColumnString
+	CollectionID postgres.ColumnInteger
 	CreatedAt    postgres.ColumnTimestampz
 	UpdatedAt    postgres.ColumnTimestampz
 
@@ -52,9 +52,9 @@ func newDocumentsTable(schemaName, tableName, alias string) *DocumentsTable {
 
 func newDocumentsTableImpl(schemaName, tableName, alias string) documentsTable {
 	var (
-		IDColumn           = postgres.StringColumn("id")
+		IDColumn           = postgres.IntegerColumn("id")
 		ContentColumn      = postgres.StringColumn("content")
-		CollectionIDColumn = postgres.StringColumn("collection_id")
+		CollectionIDColumn = postgres.IntegerColumn("collection_id")
 		CreatedAtColumn    = postgres.TimestampzColumn("created_at")
 		UpdatedAtColumn    = postgres.TimestampzColumn("updated_at")
 		allColumns         = postgres.ColumnList{IDColumn, ContentColumn, CollectionIDColumn, CreatedAtColumn, UpdatedAtColumn}

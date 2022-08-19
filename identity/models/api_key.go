@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"encore.dev/storage/sqldb"
-	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/postgres"
 	log "github.com/sirupsen/logrus"
 
@@ -16,7 +15,7 @@ var db = sqldb.Named("identity").Stdlib()
 
 // NewApiKey generates a new API key structure from an encrypted key
 // value and a user ID. Never give plain API key values to this function.
-func NewApiKey(value string, userID uuid.UUID) *model.APIKeys {
+func NewApiKey(value string, userID int64) *model.APIKeys {
 	return &model.APIKeys{
 		Value:  value,
 		UserID: userID,
@@ -25,7 +24,7 @@ func NewApiKey(value string, userID uuid.UUID) *model.APIKeys {
 
 // ListApiKeysForUser fetches all the API keys for a specific user, returns an empty array
 // on an error.
-func ListApiKeysForUser(ctx context.Context, userID uuid.UUID) ([]*model.APIKeys, error) {
+func ListApiKeysForUser(ctx context.Context, userID int64) ([]*model.APIKeys, error) {
 	statement := postgres.SELECT(
 		table.APIKeys.ID,
 		table.APIKeys.Value,
@@ -34,7 +33,7 @@ func ListApiKeysForUser(ctx context.Context, userID uuid.UUID) ([]*model.APIKeys
 		table.APIKeys.CreatedAt,
 		table.APIKeys.UpdatedAt,
 	).FROM(table.APIKeys).WHERE(
-		table.APIKeys.UserID.EQ(postgres.UUID(userID)),
+		table.APIKeys.UserID.EQ(postgres.Int64(userID)),
 	)
 
 	var keys []*model.APIKeys
@@ -50,7 +49,7 @@ func ListApiKeysForUser(ctx context.Context, userID uuid.UUID) ([]*model.APIKeys
 // GetApiKey gets an API key from a database ID, returning it
 // if successfully fetched. This should only be called internally as
 // it risks exposing keys not owned by users if they guess the ID.
-func GetApiKey(ctx context.Context, id uuid.UUID) (*model.APIKeys, error) {
+func GetApiKey(ctx context.Context, id int64) (*model.APIKeys, error) {
 	statement := postgres.SELECT(
 		table.APIKeys.ID,
 		table.APIKeys.Value,
@@ -59,7 +58,7 @@ func GetApiKey(ctx context.Context, id uuid.UUID) (*model.APIKeys, error) {
 		table.APIKeys.CreatedAt,
 		table.APIKeys.UpdatedAt,
 	).FROM(table.APIKeys).WHERE(
-		table.APIKeys.ID.EQ(postgres.UUID(id)),
+		table.APIKeys.ID.EQ(postgres.Int64(id)),
 	).LIMIT(1)
 
 	key := model.APIKeys{}
@@ -74,7 +73,7 @@ func GetApiKey(ctx context.Context, id uuid.UUID) (*model.APIKeys, error) {
 
 // GetApiKeyForUser gets an API key from a database ID for a specific user, returning it
 // if successfully fetched.
-func GetApiKeyForUser(ctx context.Context, id, userID uuid.UUID) (*model.APIKeys, error) {
+func GetApiKeyForUser(ctx context.Context, id, userID int64) (*model.APIKeys, error) {
 	statement := postgres.SELECT(
 		table.APIKeys.ID,
 		table.APIKeys.Value,
@@ -83,7 +82,7 @@ func GetApiKeyForUser(ctx context.Context, id, userID uuid.UUID) (*model.APIKeys
 		table.APIKeys.CreatedAt,
 		table.APIKeys.UpdatedAt,
 	).FROM(table.APIKeys).WHERE(
-		table.APIKeys.ID.EQ(postgres.UUID(id)).AND(table.APIKeys.UserID.EQ(postgres.UUID(userID))),
+		table.APIKeys.ID.EQ(postgres.Int64(id)).AND(table.APIKeys.UserID.EQ(postgres.Int64(userID))),
 	).LIMIT(1)
 
 	key := model.APIKeys{}
@@ -134,10 +133,10 @@ func SaveApiKey(ctx context.Context, key *model.APIKeys) error {
 // TransferApiKeys will transfer all api keys from a user to another. This is useful when
 // deleting temporary users to merge their data with an existing user. We should NEVER
 // allow transfer of API keys in other contexts.
-func TransferApiKeys(ctx context.Context, oldUserID, newUserID uuid.UUID) error {
+func TransferApiKeys(ctx context.Context, oldUserID, newUserID int64) error {
 	query, args := table.APIKeys.UPDATE().SET(
-		table.APIKeys.UserID.SET(postgres.UUID(newUserID)),
-	).WHERE(table.APIKeys.UserID.EQ(postgres.UUID(oldUserID))).Sql()
+		table.APIKeys.UserID.SET(postgres.Int64(newUserID)),
+	).WHERE(table.APIKeys.UserID.EQ(postgres.Int64(oldUserID))).Sql()
 
 	transferredCount := 0
 	err := db.QueryRowContext(ctx, query, args...).Scan(&transferredCount)
@@ -160,14 +159,14 @@ func TransferApiKeys(ctx context.Context, oldUserID, newUserID uuid.UUID) error 
 func DeleteApiKey(ctx context.Context, key *model.APIKeys) error {
 	query, args := table.APIKeys.
 		DELETE().
-		WHERE(table.APIKeys.ID.EQ(postgres.UUID(key.ID))).
+		WHERE(table.APIKeys.ID.EQ(postgres.Int64(key.ID))).
 		RETURNING(table.APIKeys.ID).
 		Sql()
 
-	deletedID := uuid.Nil
+	deletedID := 0
 	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
 
-	if err != nil || deletedID == uuid.Nil {
+	if err != nil || deletedID == 0 {
 		log.WithError(err).Errorf("Could not delete key")
 		return err
 	}

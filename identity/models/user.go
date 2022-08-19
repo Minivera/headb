@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 
-	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/postgres"
 	log "github.com/sirupsen/logrus"
 
@@ -20,8 +19,8 @@ func NewPendingUser() *model.Users {
 }
 
 // GetUserByID fetches a user with an integer ID
-func GetUserByID(ctx context.Context, id uuid.UUID) (*model.Users, error) {
-	return GetUserBy(ctx, table.Users.ID.EQ(postgres.UUID(id)))
+func GetUserByID(ctx context.Context, id int64) (*model.Users, error) {
+	return GetUserBy(ctx, table.Users.ID.EQ(postgres.Int64(id)))
 }
 
 // GetUserByUniqueID fetches a user with the string unique ID given by the
@@ -55,7 +54,7 @@ func GetUserBy(ctx context.Context, expression postgres.BoolExpression) (*model.
 
 // SaveUser saves the data of the user it used on.
 func SaveUser(ctx context.Context, user *model.Users) error {
-	if user.ID == uuid.Nil {
+	if user.ID == 0 {
 		query, args := table.Users.INSERT(
 			table.Users.Username,
 			table.Users.Token,
@@ -108,7 +107,7 @@ func SaveUser(ctx context.Context, user *model.Users) error {
 		user.UniqueID,
 		user.Status,
 	).WHERE(
-		table.Users.ID.EQ(postgres.UUID(user.ID)),
+		table.Users.ID.EQ(postgres.Int64(user.ID)),
 	).RETURNING(
 		table.Users.ID,
 		table.Users.Username,
@@ -135,14 +134,14 @@ func SaveUser(ctx context.Context, user *model.Users) error {
 func DeleteUser(ctx context.Context, user *model.Users) error {
 	query, args := table.Users.
 		DELETE().
-		WHERE(table.Users.ID.EQ(postgres.UUID(user.ID))).
+		WHERE(table.Users.ID.EQ(postgres.Int64(user.ID))).
 		RETURNING(table.Users.ID).
 		Sql()
 
-	deletedID := uuid.Nil
+	deletedID := 0
 	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
 
-	if err != nil || deletedID == uuid.Nil {
+	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete user")
 		return err
 	}

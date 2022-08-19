@@ -1,12 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"flag"
-	"io/ioutil"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 
@@ -66,36 +62,6 @@ func main() {
 	})
 	if err != nil {
 		log.WithError(err).Fatal("Could not execute jet database model generation")
-		return
-	}
-
-	log.Info("Replacing all types for uuids to encore uuids")
-	err = filepath.Walk("./generated", func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		fileExtension := filepath.Ext(path)
-
-		if info.IsDir() || fileExtension != ".go" {
-			log.Infof("Ignored file %s because it was a directory or not a go file", path)
-			return nil
-		}
-
-		input, err := ioutil.ReadFile(path)
-		if err != nil {
-			return err
-		}
-
-		output := bytes.Replace(input, []byte("github.com/google/uuid"), []byte("encore.dev/types/uuid"), -1)
-
-		if err = ioutil.WriteFile(path, output, info.Mode()); err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		log.WithError(err).Fatal("Could not list generated files or replace their content")
 		return
 	}
 

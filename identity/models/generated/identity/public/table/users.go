@@ -17,7 +17,7 @@ type usersTable struct {
 	postgres.Table
 
 	//Columns
-	ID        postgres.ColumnString
+	ID        postgres.ColumnInteger
 	Username  postgres.ColumnString
 	Token     postgres.ColumnString
 	CreatedAt postgres.ColumnTimestampz
@@ -54,7 +54,7 @@ func newUsersTable(schemaName, tableName, alias string) *UsersTable {
 
 func newUsersTableImpl(schemaName, tableName, alias string) usersTable {
 	var (
-		IDColumn        = postgres.StringColumn("id")
+		IDColumn        = postgres.IntegerColumn("id")
 		UsernameColumn  = postgres.StringColumn("username")
 		TokenColumn     = postgres.StringColumn("token")
 		CreatedAtColumn = postgres.TimestampzColumn("created_at")

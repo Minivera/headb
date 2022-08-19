@@ -8,14 +8,13 @@
 package model
 
 import (
-	"encore.dev/types/uuid"
 	"time"
 )
 
 type Permissions struct {
-	ID         uuid.UUID `sql:"primary_key"`
-	KeyID      uuid.UUID
-	DatabaseID *uuid.UUID
+	ID         int64 `sql:"primary_key"`
+	KeyID      int64
+	DatabaseID *int64
 	Role       Role
 	CreatedAt  time.Time
 	UpdatedAt  time.Time

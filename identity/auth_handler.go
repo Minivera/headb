@@ -2,10 +2,10 @@ package identity
 
 import (
 	"context"
+	"strconv"
 
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
-	"encore.dev/types/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/identity/models/generated/identity/public/model"
@@ -13,8 +13,8 @@ import (
 
 // UserData is the data containing the relevant information about the logged in user.
 type UserData struct {
-	KeyID    uuid.UUID
-	ID       uuid.UUID
+	KeyID    int64
+	ID       int64
 	Username string
 	Token    string
 }
@@ -54,7 +54,7 @@ func AuthHandler(ctx context.Context, token string) (auth.UID, *UserData, error)
 		}
 	}
 
-	return auth.UID(response.User.ID.String()), &UserData{
+	return auth.UID(strconv.FormatInt(response.User.ID, 10)), &UserData{
 		KeyID:    response.KeyID,
 		ID:       response.User.ID,
 		Token:    *response.User.Token,

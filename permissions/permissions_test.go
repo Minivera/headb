@@ -5,12 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"encore.dev/beta/errs"
-	"encore.dev/storage/sqldb"
-	"encore.dev/types/uuid"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	content_models "encore.app/content/models"
 	test_utils_content "encore.app/content/test_utils"
 	"encore.app/permissions/models"
@@ -18,6 +12,10 @@ import (
 	"encore.app/permissions/models/generated/permissions/public/table"
 	"encore.app/permissions/test_utils"
 	test_utils2 "encore.app/test_utils"
+	"encore.dev/beta/errs"
+	"encore.dev/storage/sqldb"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func insertPermissions(ctx context.Context, permissions []*model.Permissions) error {
@@ -53,29 +51,23 @@ func TestAddPermissionSet(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	secondUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	// Use models directly to avoid cyclic dependencies
 	// FIXME: Fix this
-	existingDatabase := content_models.NewDatabase("test", newUUID)
-	err = content_models.SaveDatabase(context.Background(), existingDatabase)
+	existingDatabase := content_models.NewDatabase("test", 1)
+	err := content_models.SaveDatabase(context.Background(), existingDatabase)
 	require.NoError(t, err)
 
 	existingPermissions := []*model.Permissions{
 		{
-			KeyID:      newUUID,
-			DatabaseID: test_utils.UUIDPointer(existingDatabase.ID),
+			KeyID:      1,
+			DatabaseID: test_utils.Int64Pointer(existingDatabase.ID),
 			Role:       "admin",
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
 		},
 	}
 
-	secondDatabase := content_models.NewDatabase("test2", newUUID)
+	secondDatabase := content_models.NewDatabase("test2", 1)
 	err = content_models.SaveDatabase(context.Background(), secondDatabase)
 	require.NoError(t, err)
 
@@ -89,16 +81,16 @@ func TestAddPermissionSet(t *testing.T) {
 		{
 			scenario: "Will create a permissions set with a database ID",
 			params: &AddPermissionSetParams{
-				KeyID:      secondUUID,
-				UserID:     newUUID,
-				DatabaseID: test_utils.UUIDPointer(secondDatabase.ID),
+				KeyID:      1234,
+				UserID:     1,
+				DatabaseID: test_utils.Int64Pointer(secondDatabase.ID),
 				Role:       "read",
 			},
 			expected: expected{
 				response: &AddPermissionSetResponse{
 					PermissionSet: &model.Permissions{
-						KeyID:      secondUUID,
-						DatabaseID: test_utils.UUIDPointer(secondDatabase.ID),
+						KeyID:      1234,
+						DatabaseID: test_utils.Int64Pointer(secondDatabase.ID),
 						Role:       "read",
 					},
 				},
@@ -107,14 +99,14 @@ func TestAddPermissionSet(t *testing.T) {
 		{
 			scenario: "Will create a permissions set without a database ID",
 			params: &AddPermissionSetParams{
-				KeyID:  secondUUID,
-				UserID: newUUID,
+				KeyID:  1234,
+				UserID: 1,
 				Role:   "read",
 			},
 			expected: expected{
 				response: &AddPermissionSetResponse{
 					PermissionSet: &model.Permissions{
-						KeyID: secondUUID,
+						KeyID: 1234,
 						Role:  "read",
 					},
 				},
@@ -123,8 +115,8 @@ func TestAddPermissionSet(t *testing.T) {
 		{
 			scenario: "Will fail when the role is invalid",
 			params: &AddPermissionSetParams{
-				KeyID:  secondUUID,
-				UserID: newUUID,
+				KeyID:  1234,
+				UserID: 1,
 				Role:   "invalid",
 			},
 			expected: expected{
@@ -137,9 +129,9 @@ func TestAddPermissionSet(t *testing.T) {
 		{
 			scenario: "Will fail if the database cannot be found",
 			params: &AddPermissionSetParams{
-				KeyID:      secondUUID,
-				UserID:     newUUID,
-				DatabaseID: &uuid.Nil,
+				KeyID:      1234,
+				UserID:     1,
+				DatabaseID: test_utils.Int64Pointer(-1),
 				Role:       "read",
 			},
 			expected: expected{
@@ -152,9 +144,9 @@ func TestAddPermissionSet(t *testing.T) {
 		{
 			scenario: "Will fail if the set already exists",
 			params: &AddPermissionSetParams{
-				KeyID:      newUUID,
-				UserID:     newUUID,
-				DatabaseID: test_utils.UUIDPointer(existingDatabase.ID),
+				KeyID:      1,
+				UserID:     1,
+				DatabaseID: test_utils.Int64Pointer(existingDatabase.ID),
 				Role:       "read",
 			},
 			expected: expected{
@@ -199,17 +191,11 @@ func TestRemovePermissionSet(t *testing.T) {
 		err      error
 	}
 
-	badUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	existingPermissions := []*model.Permissions{
 		{
-			ID:         newUUID,
-			KeyID:      newUUID,
-			DatabaseID: &newUUID,
+			ID:         1,
+			KeyID:      1,
+			DatabaseID: test_utils.Int64Pointer(1),
 			Role:       "admin",
 			CreatedAt:  time.Now(),
 			UpdatedAt:  time.Now(),
@@ -235,7 +221,7 @@ func TestRemovePermissionSet(t *testing.T) {
 		{
 			scenario: "Will fail if the set cannot be found",
 			params: &RemovePermissionSetParams{
-				ID: badUUID,
+				ID: -1,
 			},
 			expected: expected{
 				err: &errs.Error{
@@ -275,12 +261,6 @@ func TestCan(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	badUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	now := time.Now()
 	tcs := []struct {
 		scenario            string
@@ -291,13 +271,13 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return true when checking if an admin can admin",
 			params: &CanParams{
-				KeyID:     newUUID,
+				KeyID:     1,
 				Operation: "admin",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:        newUUID,
-					KeyID:     newUUID,
+					ID:        1,
+					KeyID:     1,
 					Role:      "admin",
 					CreatedAt: now,
 					UpdatedAt: now,
@@ -312,13 +292,13 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return true when checking if an admin can write",
 			params: &CanParams{
-				KeyID:     newUUID,
+				KeyID:     1,
 				Operation: "write",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:        newUUID,
-					KeyID:     newUUID,
+					ID:        1,
+					KeyID:     1,
 					Role:      "admin",
 					CreatedAt: now,
 					UpdatedAt: now,
@@ -333,13 +313,13 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return true when checking if an admin can read",
 			params: &CanParams{
-				KeyID:     newUUID,
+				KeyID:     1,
 				Operation: "read",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:        newUUID,
-					KeyID:     newUUID,
+					ID:        1,
+					KeyID:     1,
 					Role:      "admin",
 					CreatedAt: now,
 					UpdatedAt: now,
@@ -354,13 +334,13 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return false when checking if a writer can admin",
 			params: &CanParams{
-				KeyID:     newUUID,
+				KeyID:     1,
 				Operation: "admin",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:        newUUID,
-					KeyID:     newUUID,
+					ID:        1,
+					KeyID:     1,
 					Role:      "write",
 					CreatedAt: now,
 					UpdatedAt: now,
@@ -375,13 +355,13 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return true when checking if a writer can write",
 			params: &CanParams{
-				KeyID:     newUUID,
+				KeyID:     1,
 				Operation: "write",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:        newUUID,
-					KeyID:     newUUID,
+					ID:        1,
+					KeyID:     1,
 					Role:      "write",
 					CreatedAt: now,
 					UpdatedAt: now,
@@ -396,13 +376,13 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return true when checking if a writer can read",
 			params: &CanParams{
-				KeyID:     newUUID,
+				KeyID:     1,
 				Operation: "read",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:        newUUID,
-					KeyID:     newUUID,
+					ID:        1,
+					KeyID:     1,
 					Role:      "write",
 					CreatedAt: now,
 					UpdatedAt: now,
@@ -417,13 +397,13 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return false when checking if a reader can admin",
 			params: &CanParams{
-				KeyID:     newUUID,
+				KeyID:     1,
 				Operation: "admin",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:        newUUID,
-					KeyID:     newUUID,
+					ID:        1,
+					KeyID:     1,
 					Role:      "read",
 					CreatedAt: now,
 					UpdatedAt: now,
@@ -438,13 +418,13 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return false when checking if a reader can write",
 			params: &CanParams{
-				KeyID:     newUUID,
+				KeyID:     1,
 				Operation: "write",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:        newUUID,
-					KeyID:     newUUID,
+					ID:        1,
+					KeyID:     1,
 					Role:      "read",
 					CreatedAt: now,
 					UpdatedAt: now,
@@ -459,13 +439,13 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return true when checking if a reader can read",
 			params: &CanParams{
-				KeyID:     newUUID,
+				KeyID:     1,
 				Operation: "read",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:        newUUID,
-					KeyID:     newUUID,
+					ID:        1,
+					KeyID:     1,
 					Role:      "read",
 					CreatedAt: now,
 					UpdatedAt: now,
@@ -480,15 +460,15 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return true when checking for an Allowed operation for a key on a database ID",
 			params: &CanParams{
-				KeyID:      newUUID,
-				DatabaseID: test_utils.UUIDPointer(newUUID),
+				KeyID:      1,
+				DatabaseID: test_utils.Int64Pointer(1),
 				Operation:  "read",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:         newUUID,
-					KeyID:      newUUID,
-					DatabaseID: &newUUID,
+					ID:         1,
+					KeyID:      1,
+					DatabaseID: test_utils.Int64Pointer(1),
 					Role:       "write",
 					CreatedAt:  now,
 					UpdatedAt:  now,
@@ -503,15 +483,15 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return false when checking an Allowed operation for a key on the wrong database ID",
 			params: &CanParams{
-				KeyID:      newUUID,
-				DatabaseID: test_utils.UUIDPointer(badUUID),
+				KeyID:      1,
+				DatabaseID: test_utils.Int64Pointer(2),
 				Operation:  "read",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:         newUUID,
-					KeyID:      newUUID,
-					DatabaseID: &newUUID,
+					ID:         1,
+					KeyID:      1,
+					DatabaseID: test_utils.Int64Pointer(1),
 					Role:       "write",
 					CreatedAt:  now,
 					UpdatedAt:  now,
@@ -526,15 +506,15 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will return false when checking an unAllowed operation for a key on a database ID",
 			params: &CanParams{
-				KeyID:      newUUID,
-				DatabaseID: test_utils.UUIDPointer(newUUID),
+				KeyID:      1,
+				DatabaseID: test_utils.Int64Pointer(1),
 				Operation:  "admin",
 			},
 			existingPermissions: []*model.Permissions{
 				{
-					ID:         newUUID,
-					KeyID:      newUUID,
-					DatabaseID: &newUUID,
+					ID:         1,
+					KeyID:      1,
+					DatabaseID: test_utils.Int64Pointer(1),
 					Role:       "write",
 					CreatedAt:  now,
 					UpdatedAt:  now,
@@ -549,7 +529,7 @@ func TestCan(t *testing.T) {
 		{
 			scenario: "Will fail if given an invalid operation",
 			params: &CanParams{
-				KeyID:     newUUID,
+				KeyID:     1,
 				Operation: "invalid",
 			},
 			existingPermissions: []*model.Permissions{},

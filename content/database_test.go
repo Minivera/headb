@@ -2,13 +2,13 @@ package content
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
 	"encore.dev/storage/sqldb"
-	"encore.dev/types/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -72,23 +72,17 @@ func TestListDatabases(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	secondUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	validDatabases := []*model.Databases{
 		{
-			ID:        newUUID,
-			UserID:    newUUID,
+			ID:        2,
+			UserID:    1,
 			Name:      "test",
 			CreatedAt: now,
 			UpdatedAt: now,
 		},
 		{
-			ID:        secondUUID,
-			UserID:    newUUID,
+			ID:        3,
+			UserID:    1,
 			Name:      "test2",
 			CreatedAt: now,
 			UpdatedAt: now,
@@ -105,8 +99,8 @@ func TestListDatabases(t *testing.T) {
 		{
 			scenario: "Returns a list of databases owned by a user",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			userCan:           test_utils.StringPointer("admin"),
 			existingDatabases: validDatabases,
@@ -119,8 +113,8 @@ func TestListDatabases(t *testing.T) {
 		{
 			scenario: "Returns empty when the user owns no databases",
 			userData: &identity.UserData{
-				ID:    secondUUID,
-				KeyID: newUUID,
+				ID:    2,
+				KeyID: 1,
 			},
 			userCan:           test_utils.StringPointer("admin"),
 			existingDatabases: validDatabases,
@@ -133,8 +127,8 @@ func TestListDatabases(t *testing.T) {
 		{
 			scenario: "Fails if the key cannot view the databases",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			existingDatabases: validDatabases,
 			expected: expected{
@@ -148,7 +142,7 @@ func TestListDatabases(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -157,7 +151,7 @@ func TestListDatabases(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID: newUUID,
+					KeyID: 1,
 					Role:  *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -183,19 +177,10 @@ func TestGetDatabase(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	secondUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	badUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	validDatabases := []*model.Databases{
 		{
-			ID:        newUUID,
-			UserID:    newUUID,
+			ID:        2,
+			UserID:    1,
 			Name:      "test",
 			CreatedAt: now,
 			UpdatedAt: now,
@@ -213,8 +198,8 @@ func TestGetDatabase(t *testing.T) {
 		{
 			scenario: "Returns a database by ID, owned by a user",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			userCan:           test_utils.StringPointer("read"),
 			params:            &GetDatabaseParams{ID: validDatabases[0].ID},
@@ -228,11 +213,11 @@ func TestGetDatabase(t *testing.T) {
 		{
 			scenario: "Returns an error when the database is not found",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			userCan:           test_utils.StringPointer("read"),
-			params:            &GetDatabaseParams{ID: badUUID},
+			params:            &GetDatabaseParams{ID: 3},
 			existingDatabases: validDatabases,
 			expected: expected{
 				err: &errs.Error{
@@ -244,8 +229,8 @@ func TestGetDatabase(t *testing.T) {
 		{
 			scenario: "Returns an error when the user does not own the database",
 			userData: &identity.UserData{
-				ID:    secondUUID,
-				KeyID: newUUID,
+				ID:    2,
+				KeyID: 1,
 			},
 			userCan:           test_utils.StringPointer("read"),
 			params:            &GetDatabaseParams{ID: validDatabases[0].ID},
@@ -260,8 +245,8 @@ func TestGetDatabase(t *testing.T) {
 		{
 			scenario: "Fails if the key cannot view the database",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			params:            &GetDatabaseParams{ID: validDatabases[0].ID},
 			existingDatabases: validDatabases,
@@ -276,7 +261,7 @@ func TestGetDatabase(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -285,7 +270,7 @@ func TestGetDatabase(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID: newUUID,
+					KeyID: 1,
 					Role:  *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -312,12 +297,6 @@ func TestCreateDatabase(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	secondUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	tcs := []struct {
 		scenario          string
 		userData          *identity.UserData
@@ -329,8 +308,8 @@ func TestCreateDatabase(t *testing.T) {
 		{
 			scenario: "Will create and return a database",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			userCan: test_utils.StringPointer("admin"),
 			params: &CreateDatabaseParams{
@@ -347,8 +326,8 @@ func TestCreateDatabase(t *testing.T) {
 		{
 			scenario: "Will throw an error when a database already exists",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			userCan: test_utils.StringPointer("admin"),
 			params: &CreateDatabaseParams{
@@ -356,8 +335,8 @@ func TestCreateDatabase(t *testing.T) {
 			},
 			existingDatabases: []*model.Databases{
 				{
-					ID:        secondUUID,
-					UserID:    newUUID,
+					ID:        2,
+					UserID:    1,
 					Name:      "test",
 					CreatedAt: now,
 					UpdatedAt: now,
@@ -373,8 +352,8 @@ func TestCreateDatabase(t *testing.T) {
 		{
 			scenario: "Fails if the key cannot act on the database",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			params: &CreateDatabaseParams{
 				Name: "test",
@@ -390,7 +369,7 @@ func TestCreateDatabase(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -399,7 +378,7 @@ func TestCreateDatabase(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID: newUUID,
+					KeyID: 1,
 					Role:  *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -425,15 +404,9 @@ func TestUpdateDatabase(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	badUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	validDatabase := &model.Databases{
-		ID:        newUUID,
-		UserID:    newUUID,
+		ID:        2,
+		UserID:    1,
 		Name:      "test",
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -450,8 +423,8 @@ func TestUpdateDatabase(t *testing.T) {
 		{
 			scenario: "Will update an existing database and return its data",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			userCan: test_utils.StringPointer("admin"),
 			params: &UpdateDatabaseParams{
@@ -471,12 +444,12 @@ func TestUpdateDatabase(t *testing.T) {
 		{
 			scenario: "Will throw an error when the database does not exists",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			userCan: test_utils.StringPointer("admin"),
 			params: &UpdateDatabaseParams{
-				ID:   badUUID,
+				ID:   -1,
 				Name: "updated",
 			},
 			existingDatabases: []*model.Databases{validDatabase},
@@ -490,8 +463,8 @@ func TestUpdateDatabase(t *testing.T) {
 		{
 			scenario: "Will throw an error when a database with this name already exists",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			userCan: test_utils.StringPointer("admin"),
 			params: &UpdateDatabaseParams{
@@ -509,8 +482,8 @@ func TestUpdateDatabase(t *testing.T) {
 		{
 			scenario: "Will throw an error when the key cannot act on the databases",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			params: &UpdateDatabaseParams{
 				ID:   validDatabase.ID,
@@ -528,7 +501,7 @@ func TestUpdateDatabase(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -537,7 +510,7 @@ func TestUpdateDatabase(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID: newUUID,
+					KeyID: 1,
 					Role:  *tc.userCan,
 				})
 				require.NoError(t, err)
@@ -563,18 +536,9 @@ func TestDeleteDatabase(t *testing.T) {
 		err      error
 	}
 
-	newUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	secondUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
-	badUUID, err := uuid.NewV4()
-	require.NoError(t, err)
-
 	validDatabase := &model.Databases{
-		ID:        secondUUID,
-		UserID:    newUUID,
+		ID:        2,
+		UserID:    1,
 		Name:      "test",
 		CreatedAt: now,
 		UpdatedAt: now,
@@ -591,8 +555,8 @@ func TestDeleteDatabase(t *testing.T) {
 		{
 			scenario: "Will delete an existing database and return its data",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			userCan: test_utils.StringPointer("admin"),
 			params: &DeleteDatabaseParams{
@@ -611,12 +575,12 @@ func TestDeleteDatabase(t *testing.T) {
 		{
 			scenario: "Will throw an error when the database does not exists",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			userCan: test_utils.StringPointer("admin"),
 			params: &DeleteDatabaseParams{
-				ID: badUUID,
+				ID: -1,
 			},
 			existingDatabases: []*model.Databases{validDatabase},
 			expected: expected{
@@ -629,8 +593,8 @@ func TestDeleteDatabase(t *testing.T) {
 		{
 			scenario: "Will fail if the key cannot act on databases",
 			userData: &identity.UserData{
-				ID:    newUUID,
-				KeyID: newUUID,
+				ID:    1,
+				KeyID: 1,
 			},
 			params: &DeleteDatabaseParams{
 				ID: validDatabase.ID,
@@ -647,7 +611,7 @@ func TestDeleteDatabase(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.scenario, func(t *testing.T) {
-			ctx := auth.WithContext(context.Background(), auth.UID(tc.userData.ID.String()), tc.userData)
+			ctx := auth.WithContext(context.Background(), auth.UID(strconv.FormatInt(tc.userData.ID, 10)), tc.userData)
 			defer test_utils.Cleanup(ctx)
 			defer test_utils_permissions.Cleanup(ctx)
 
@@ -656,7 +620,7 @@ func TestDeleteDatabase(t *testing.T) {
 
 			if tc.userCan != nil {
 				_, err := permissions.AddPermissionSet(ctx, &permissions.AddPermissionSetParams{
-					KeyID: newUUID,
+					KeyID: 1,
 					Role:  *tc.userCan,
 				})
 				require.NoError(t, err)

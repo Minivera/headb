@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"encore.dev/beta/errs"
-	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/qrm"
 	log "github.com/sirupsen/logrus"
 
@@ -15,7 +14,7 @@ import (
 
 // GetDocument gets a document from a document ID and a user ID and returns a valid encore error
 // if the document could not be fetched.
-func GetDocument(ctx context.Context, documentID uuid.UUID, userID uuid.UUID) (*model.Documents, error) {
+func GetDocument(ctx context.Context, documentID, userID int64) (*model.Documents, error) {
 	document, err := models.GetDocumentByUser(ctx, documentID, userID)
 	if errors.Is(err, qrm.ErrNoRows) {
 		log.WithError(err).Warning("Could not find document by ID")

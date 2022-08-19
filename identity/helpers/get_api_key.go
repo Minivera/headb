@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"encore.dev/beta/errs"
-	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/qrm"
 	log "github.com/sirupsen/logrus"
 
@@ -15,7 +14,7 @@ import (
 
 // GetApiKey gets an API key from a key ID and a user ID and returns a valid encore error
 // if the key could not be fetched.
-func GetApiKey(ctx context.Context, apiKeyID, userID uuid.UUID) (*model.APIKeys, error) {
+func GetApiKey(ctx context.Context, apiKeyID, userID int64) (*model.APIKeys, error) {
 	apiKey, err := models.GetApiKeyForUser(ctx, apiKeyID, userID)
 	if errors.Is(err, qrm.ErrNoRows) {
 		log.WithError(err).Warning("Could not find an API key by the given ID")

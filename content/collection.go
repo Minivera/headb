@@ -3,7 +3,6 @@ package content
 import (
 	"context"
 
-	"encore.dev/types/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/content/convert"
@@ -13,7 +12,7 @@ import (
 // ListCollectionsParams is the parameters for listing the collections of a database
 type ListCollectionsParams struct {
 	// The unique identifier of the database
-	DatabaseID uuid.UUID
+	DatabaseID int64
 }
 
 // ListCollectionsResponse is the list of collections for the given database
@@ -40,7 +39,7 @@ func ListCollections(ctx context.Context, params *ListCollectionsParams) (*ListC
 // GetCollectionParams is the parameters for finding a collection by ID
 type GetCollectionParams struct {
 	// The unique identifier of the collection
-	ID uuid.UUID
+	ID int64
 }
 
 // GetCollectionResponse is the result of having fetched a collection
@@ -65,7 +64,7 @@ func GetCollection(ctx context.Context, params *GetCollectionParams) (*GetCollec
 // CreateCollectionParams is the parameters for creating a collection for documents
 type CreateCollectionParams struct {
 	// The unique ID of the database to add this collection to
-	DatabaseID uuid.UUID
+	DatabaseID int64
 
 	// The name of the collection
 	Name string
@@ -97,7 +96,7 @@ func CreateCollection(ctx context.Context, params *CreateCollectionParams) (*Cre
 // UpdateCollectionParams is the parameters for updating a collection
 type UpdateCollectionParams struct {
 	// The unique identifier for the collection
-	ID uuid.UUID
+	ID int64
 
 	// The name of the collection
 	Name string
@@ -129,7 +128,7 @@ func UpdateCollection(ctx context.Context, params *UpdateCollectionParams) (*Upd
 // DeleteCollectionParams is the parameters for deleting a collection
 type DeleteCollectionParams struct {
 	// The unique identifier for the collection
-	ID uuid.UUID
+	ID int64
 }
 
 // DeleteCollectionResponse is the result of deleting a collection for documents

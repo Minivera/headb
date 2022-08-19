@@ -3,15 +3,13 @@ package convert
 import (
 	"time"
 
-	"encore.dev/types/uuid"
-
 	"encore.app/content/models/generated/content/public/model"
 )
 
 // CollectionPayload is an API safe version of a collection.
 type CollectionPayload struct {
 	// The collection unique identifier
-	ID uuid.UUID
+	ID int64
 
 	// The collection unique name
 	Name      string

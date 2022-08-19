@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"encore.dev/storage/sqldb"
-	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/postgres"
 	log "github.com/sirupsen/logrus"
 
@@ -15,7 +14,7 @@ import (
 var db = sqldb.Named("permissions").Stdlib()
 
 // NewPermissionSet generates a new PermissionSet structure using the given unique IDs.
-func NewPermissionSet(keyID uuid.UUID, databaseID *uuid.UUID, role model.Role) *model.Permissions {
+func NewPermissionSet(keyID int64, databaseID *int64, role model.Role) *model.Permissions {
 	return &model.Permissions{
 		KeyID:      keyID,
 		DatabaseID: databaseID,
@@ -24,7 +23,7 @@ func NewPermissionSet(keyID uuid.UUID, databaseID *uuid.UUID, role model.Role) *
 }
 
 // GetPermissionByID fetches a single permissionSet by ID. Returns nil on an error.
-func GetPermissionByID(ctx context.Context, id uuid.UUID) (*model.Permissions, error) {
+func GetPermissionByID(ctx context.Context, id int64) (*model.Permissions, error) {
 	statement := postgres.SELECT(
 		table.Permissions.ID,
 		table.Permissions.KeyID,
@@ -35,7 +34,7 @@ func GetPermissionByID(ctx context.Context, id uuid.UUID) (*model.Permissions, e
 	).FROM(
 		table.Permissions,
 	).WHERE(
-		table.Permissions.ID.EQ(postgres.UUID(id)),
+		table.Permissions.ID.EQ(postgres.Int64(id)),
 	).LIMIT(1)
 
 	permissionSet := model.Permissions{}
@@ -50,10 +49,10 @@ func GetPermissionByID(ctx context.Context, id uuid.UUID) (*model.Permissions, e
 
 // GetPermission fetches a single permissionSet record given a key ID and an optional
 // database ID of the database may be assigned to. Returns nil on an error.
-func GetPermission(ctx context.Context, keyID uuid.UUID, databaseID *uuid.UUID) (*model.Permissions, error) {
-	condition := table.Permissions.KeyID.EQ(postgres.UUID(keyID))
+func GetPermission(ctx context.Context, keyID int64, databaseID *int64) (*model.Permissions, error) {
+	condition := table.Permissions.KeyID.EQ(postgres.Int64(keyID))
 	if databaseID != nil {
-		condition = condition.AND(table.Permissions.DatabaseID.EQ(postgres.UUID(*databaseID)))
+		condition = condition.AND(table.Permissions.DatabaseID.EQ(postgres.Int64(*databaseID)))
 	}
 
 	statement := postgres.SELECT(
@@ -90,13 +89,13 @@ func CreatePermissionSet(ctx context.Context, permissionSet *model.Permissions) 
 
 	if permissionSet.DatabaseID != nil {
 		statement.VALUES(
-			postgres.UUID(permissionSet.KeyID),
+			postgres.Int64(permissionSet.KeyID),
 			permissionSet.Role,
-			postgres.UUID(*permissionSet.DatabaseID),
+			postgres.Int64(*permissionSet.DatabaseID),
 		)
 	} else {
 		statement.VALUES(
-			postgres.UUID(permissionSet.KeyID),
+			postgres.Int64(permissionSet.KeyID),
 			permissionSet.Role,
 			nil,
 		)
@@ -125,13 +124,13 @@ func CreatePermissionSet(ctx context.Context, permissionSet *model.Permissions) 
 func DeletePermissionSet(ctx context.Context, permissionSet *model.Permissions) error {
 	query, args := table.Permissions.
 		DELETE().
-		WHERE(table.Permissions.ID.EQ(postgres.UUID(permissionSet.ID))).
+		WHERE(table.Permissions.ID.EQ(postgres.Int64(permissionSet.ID))).
 		RETURNING(table.Permissions.ID).
 		Sql()
 
-	deletedID := uuid.Nil
+	deletedID := 0
 	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
-	if err != nil || deletedID == uuid.Nil {
+	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete permissionSet")
 		return err
 	}

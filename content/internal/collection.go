@@ -7,7 +7,6 @@ import (
 	"encore.app/content/helpers"
 	"encore.dev/beta/auth"
 	"encore.dev/beta/errs"
-	"encore.dev/types/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/content/convert"
@@ -17,7 +16,7 @@ import (
 
 // ListCollections lists all collections created by the authenticated user in the given
 // database.
-func ListCollections(ctx context.Context, databaseID uuid.UUID) ([]convert.CollectionPayload, error) {
+func ListCollections(ctx context.Context, databaseID int64) ([]convert.CollectionPayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	database, err := helpers.GetDatabase(ctx, databaseID, userData.ID)
@@ -46,7 +45,7 @@ func ListCollections(ctx context.Context, databaseID uuid.UUID) ([]convert.Colle
 }
 
 // GetCollection Finds a collection by ID
-func GetCollection(ctx context.Context, id uuid.UUID) (convert.CollectionPayload, error) {
+func GetCollection(ctx context.Context, id int64) (convert.CollectionPayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	collection, err := helpers.GetCollection(ctx, id, userData.ID)
@@ -65,7 +64,7 @@ func GetCollection(ctx context.Context, id uuid.UUID) (convert.CollectionPayload
 }
 
 // CreateCollection creates a collection for the given database if owned by the authenticated user.
-func CreateCollection(ctx context.Context, databaseID uuid.UUID, name string) (convert.CollectionPayload, error) {
+func CreateCollection(ctx context.Context, databaseID int64, name string) (convert.CollectionPayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	database, err := helpers.GetDatabase(ctx, databaseID, userData.ID)
@@ -106,7 +105,7 @@ func CreateCollection(ctx context.Context, databaseID uuid.UUID, name string) (c
 }
 
 // UpdateCollection updates a collection by ID for the authenticated user
-func UpdateCollection(ctx context.Context, id uuid.UUID, name string) (convert.CollectionPayload, error) {
+func UpdateCollection(ctx context.Context, id int64, name string) (convert.CollectionPayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	collection, err := helpers.GetCollection(ctx, id, userData.ID)
@@ -146,7 +145,7 @@ func UpdateCollection(ctx context.Context, id uuid.UUID, name string) (convert.C
 }
 
 // DeleteCollection deletes a collection by ID for the authenticated user
-func DeleteCollection(ctx context.Context, id uuid.UUID) (convert.CollectionPayload, error) {
+func DeleteCollection(ctx context.Context, id int64) (convert.CollectionPayload, error) {
 	userData := auth.Data().(*identity.UserData)
 
 	collection, err := helpers.GetCollection(ctx, id, userData.ID)

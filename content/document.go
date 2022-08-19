@@ -6,13 +6,12 @@ import (
 
 	"encore.app/content/convert"
 	"encore.app/content/internal"
-	"encore.dev/types/uuid"
 )
 
 // ListDocumentsParams is the parameters for listing the documents of a collection
 type ListDocumentsParams struct {
 	// The unique identifier of the collection
-	CollectionID uuid.UUID
+	CollectionID int64
 }
 
 // ListDocumentsResponse is the list of documents for the current user and identified collection
@@ -37,7 +36,7 @@ func ListDocuments(ctx context.Context, params *ListDocumentsParams) (*ListDocum
 // GetDocumentParams is the parameters for finding a document by ID
 type GetDocumentParams struct {
 	// The unique identifier of the document
-	ID uuid.UUID
+	ID int64
 }
 
 // GetDocumentResponse is the result of having fetched a document
@@ -62,7 +61,7 @@ func GetDocument(ctx context.Context, params *GetDocumentParams) (*GetDocumentRe
 // CreateDocumentParams is the parameters for creating a document in a collection
 type CreateDocumentParams struct {
 	// The unique identifier for the collection this document should be added to
-	CollectionID uuid.UUID
+	CollectionID int64
 
 	// The content of the document
 	Content json.RawMessage
@@ -94,7 +93,7 @@ func CreateDocument(ctx context.Context, params *CreateDocumentParams) (*CreateD
 // UpdateDocumentParams is the parameters for updating a document
 type UpdateDocumentParams struct {
 	// The unique identifier for the document
-	ID uuid.UUID
+	ID int64
 
 	// The content of the document
 	Content json.RawMessage
@@ -126,7 +125,7 @@ func UpdateDocument(ctx context.Context, params *UpdateDocumentParams) (*UpdateD
 // DeleteDocumentParams is the parameters for deleting a document
 type DeleteDocumentParams struct {
 	// The unique identifier for the document
-	ID uuid.UUID
+	ID int64
 }
 
 // DeleteDocumentResponse is the result of deleting a document for documents

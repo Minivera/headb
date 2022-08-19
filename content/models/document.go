@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 
-	"encore.dev/types/uuid"
 	"github.com/go-jet/jet/v2/postgres"
 	log "github.com/sirupsen/logrus"
 
@@ -13,7 +12,7 @@ import (
 
 // NewDocument generates a new Document structure using the given content for
 // a specific collection.
-func NewDocument(content string, collectionID uuid.UUID) *model.Documents {
+func NewDocument(content string, collectionID int64) *model.Documents {
 	return &model.Documents{
 		Content:      content,
 		CollectionID: collectionID,
@@ -22,7 +21,7 @@ func NewDocument(content string, collectionID uuid.UUID) *model.Documents {
 
 // ListDocuments lists all documents for a given collection, returning an empty slice
 // on an error.
-func ListDocuments(ctx context.Context, CollectionID uuid.UUID) ([]*model.Documents, error) {
+func ListDocuments(ctx context.Context, CollectionID int64) ([]*model.Documents, error) {
 	statement := postgres.SELECT(
 		table.Documents.ID,
 		table.Documents.Content,
@@ -30,7 +29,7 @@ func ListDocuments(ctx context.Context, CollectionID uuid.UUID) ([]*model.Docume
 		table.Documents.UpdatedAt,
 		table.Documents.CreatedAt,
 	).FROM(table.Documents).WHERE(
-		table.Documents.CollectionID.EQ(postgres.UUID(CollectionID)),
+		table.Documents.CollectionID.EQ(postgres.Int64(CollectionID)),
 	)
 
 	var documents []*model.Documents
@@ -45,7 +44,7 @@ func ListDocuments(ctx context.Context, CollectionID uuid.UUID) ([]*model.Docume
 
 // GetDocumentByUser fetches a single document record given an ID and the associated
 // user ID of the collection this document belongs to. Returns nil on an error.
-func GetDocumentByUser(ctx context.Context, ID, UserID uuid.UUID) (*model.Documents, error) {
+func GetDocumentByUser(ctx context.Context, ID, UserID int64) (*model.Documents, error) {
 	statement := postgres.SELECT(
 		table.Documents.ID,
 		table.Documents.Content,
@@ -61,8 +60,8 @@ func GetDocumentByUser(ctx context.Context, ID, UserID uuid.UUID) (*model.Docume
 			table.Collections.DatabaseID.EQ(table.Databases.ID),
 		),
 	).WHERE(
-		table.Documents.ID.EQ(postgres.UUID(ID)).
-			AND(table.Databases.UserID.EQ(postgres.UUID(UserID))),
+		table.Documents.ID.EQ(postgres.Int64(ID)).
+			AND(table.Databases.UserID.EQ(postgres.Int64(UserID))),
 	).LIMIT(1)
 
 	document := model.Documents{}
@@ -79,7 +78,7 @@ func GetDocumentByUser(ctx context.Context, ID, UserID uuid.UUID) (*model.Docume
 // the content and collection ID from the struct and updates the timestamps. SaveDocument will
 // trigger an error if the constraints are not respected.
 func SaveDocument(ctx context.Context, document *model.Documents) error {
-	if document.ID == uuid.Nil {
+	if document.ID == 0 {
 		query, args := table.Documents.INSERT(
 			table.Documents.Content,
 			table.Documents.CollectionID,
@@ -107,7 +106,7 @@ func SaveDocument(ctx context.Context, document *model.Documents) error {
 	query, args := table.Documents.UPDATE().SET(
 		table.Documents.Content.SET(postgres.String(document.Content)),
 	).WHERE(
-		table.Documents.ID.EQ(postgres.UUID(document.ID)),
+		table.Documents.ID.EQ(postgres.Int64(document.ID)),
 	).RETURNING(
 		table.Documents.ID,
 		table.Documents.UpdatedAt,
@@ -130,13 +129,13 @@ func SaveDocument(ctx context.Context, document *model.Documents) error {
 func DeleteDocument(ctx context.Context, document *model.Documents) error {
 	query, args := table.Documents.
 		DELETE().
-		WHERE(table.Documents.ID.EQ(postgres.UUID(document.ID))).
+		WHERE(table.Documents.ID.EQ(postgres.Int64(document.ID))).
 		RETURNING(table.Documents.ID).
 		Sql()
 
-	deletedID := uuid.Nil
+	deletedID := 0
 	err := db.QueryRowContext(ctx, query, args...).Scan(&deletedID)
-	if err != nil || deletedID == uuid.Nil {
+	if err != nil || deletedID == 0 {
 		log.WithError(err).Error("Could not delete document")
 		return err
 	}

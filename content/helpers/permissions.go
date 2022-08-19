@@ -3,14 +3,13 @@ package helpers
 import (
 	"context"
 
-	"encore.dev/types/uuid"
 	log "github.com/sirupsen/logrus"
 
 	"encore.app/permissions"
 )
 
 // CanAdmin checks if the given key ID can on as an admin all databases.
-func CanAdmin(ctx context.Context, keyID uuid.UUID) bool {
+func CanAdmin(ctx context.Context, keyID int64) bool {
 	can, err := permissions.Can(ctx, &permissions.CanParams{
 		KeyID:     keyID,
 		Operation: "admin",
@@ -25,23 +24,23 @@ func CanAdmin(ctx context.Context, keyID uuid.UUID) bool {
 
 // CanAdminDatabase checks if the given key ID can act as admin on the database, or on all database
 // if no permissions can be validated for specific database.
-func CanAdminDatabase(ctx context.Context, databaseID uuid.UUID, keyID uuid.UUID) bool {
+func CanAdminDatabase(ctx context.Context, databaseID, keyID int64) bool {
 	return canDoOnDatabase(ctx, "admin", databaseID, keyID)
 }
 
 // CanWriteDatabase checks if the given key ID can write on the database, or on all database
 // if no permissions can be validated for specific database.
-func CanWriteDatabase(ctx context.Context, databaseID uuid.UUID, keyID uuid.UUID) bool {
+func CanWriteDatabase(ctx context.Context, databaseID, keyID int64) bool {
 	return canDoOnDatabase(ctx, "write", databaseID, keyID)
 }
 
 // CanReadDatabase checks if the given key ID can read on the database, or on all database
 // if no permissions can be validated for specific database.
-func CanReadDatabase(ctx context.Context, databaseID uuid.UUID, keyID uuid.UUID) bool {
+func CanReadDatabase(ctx context.Context, databaseID, keyID int64) bool {
 	return canDoOnDatabase(ctx, "read", databaseID, keyID)
 }
 
-func canDoOnDatabase(ctx context.Context, operation string, databaseID uuid.UUID, keyID uuid.UUID) bool {
+func canDoOnDatabase(ctx context.Context, operation string, databaseID, keyID int64) bool {
 	can, err := permissions.Can(ctx, &permissions.CanParams{
 		KeyID:      keyID,
 		DatabaseID: &databaseID,
